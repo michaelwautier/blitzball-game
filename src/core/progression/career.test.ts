@@ -7,11 +7,10 @@ import {
   expForNextLevel,
   GROWABLE,
 } from './career'
-import { findPlayer, BESAID_AUROCHS, LUCA_GOERS, TEAMS } from '../../data/teams'
+import { findPlayer, BESAID_AUROCHS, TEAMS } from '../../data/teams'
 
 const tidus = findPlayer(BESAID_AUROCHS, 'tidus')
 const keepa = findPlayer(BESAID_AUROCHS, 'keepa')
-const bickson = findPlayer(LUCA_GOERS, 'bickson')
 
 describe('growth curves', () => {
   it('gives every player a curve for every stat', () => {
