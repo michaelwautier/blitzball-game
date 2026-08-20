@@ -446,6 +446,59 @@ describe('breakthrough', () => {
     expect(engaged[0]!.x).toBeLessThan(dispossessedAt)
   })
 
+  it('does not leave the player who won the ball frozen holding it', () => {
+    const state = newMatch('winner-free')
+    const carrier = setUpEncounter(state, 'home:tidus', 1)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 1
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    const winner = engaged[0]!
+
+    // Carried past, as any challenge is — but not *beaten*, which is what
+    // recovery means and what stops a player swimming at all.
+    expect(state.ball.carrier).toBe(winner.id)
+    expect(winner.lunge, 'the tackle had no momentum').not.toBeNull()
+    expect(winner.recovery, 'the winner was frozen for winning').toBe(0)
+  })
+
+  it('still puts the defenders who lost the challenge out of the play', () => {
+    const state = newMatch('losers-frozen')
+    const carrier = setUpEncounter(state, 'home:tidus', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    // Enough to survive the first challenge and be taken by the second.
+    encounter.endurance = tackleRange(encounter.defenders.slice(0, 1)).max + 1
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+
+    const winner = state.players.find((p) => p.id === state.ball.carrier)
+    for (const defender of engaged) {
+      if (defender.id === winner?.id) continue
+      expect(defender.recovery, `${defender.def.name} was not put out`).toBeGreaterThan(0)
+    }
+  })
+
+  it('lets the player who won it swim away with it', () => {
+    // The whole point: win the ball, then actually go somewhere.
+    const state = newMatch('swim-away')
+    const carrier = setUpEncounter(state, 'home:tidus', 1)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 1
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    const winner = state.players.find((p) => p.id === state.ball.carrier)!
+
+    // Past the lunge, then half a second — well inside the window a beaten
+    // defender would still be frozen for, which is what makes this a guard.
+    for (let i = 0; i < Math.ceil(LUNGE_SECONDS * 60) + 2; i++) stepMatch(state, 1 / 60)
+    const settled = { x: winner.x, y: winner.y }
+    for (let i = 0; i < 30; i++) stepMatch(state, 1 / 60)
+
+    expect(Math.hypot(winner.x - settled.x, winner.y - settled.y)).toBeGreaterThan(1)
+  })
+
   it('loses the ball to the strongest tackler when endurance runs out', () => {
     const state = newMatch()
     const carrier = setUpEncounter(state, 'home:tidus', 2)

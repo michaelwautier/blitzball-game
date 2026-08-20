@@ -411,8 +411,9 @@ function challengeDefenders(
 
   state.endurance = Math.max(0, endurance)
   // Everyone who put a challenge in is carried past the carrier by the end of
-  // it, whether or not they came away with the ball.
-  pushPastCarrier(state, beaten, carrier)
+  // it, whether or not they came away with the ball — but whoever won it is not
+  // out of the play, they are the play.
+  pushPastCarrier(state, beaten, carrier, tackler)
 
   return { endurance, rolls, tackler, beaten }
 }
@@ -526,10 +527,20 @@ export const LUNGE_SECONDS = 0.32
  * A challenge carries a defender past the player they went through, so leaving
  * them in front would mean a successful breakthrough changed nothing
  * positionally and the same defenders re-engaged the moment the grace period
- * ended. `recordPrevious` matters here: these bodies are being moved rather than
- * swum, and without it the renderer interpolates across the jump.
+ * ended. The momentum applies to all of them, winner included — that is what a
+ * tackle looks like.
+ *
+ * `recovery` does not. It means *beaten*, and a beaten player neither swims nor
+ * challenges until it runs down. Whoever came away with the ball was not beaten,
+ * and charging them for winning left them frozen in the water holding it, unable
+ * to swim, for a second and a half.
  */
-function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player): void {
+function pushPastCarrier(
+  state: MatchState,
+  defenders: Player[],
+  carrier: Player,
+  winner?: Player,
+): void {
   const forward = attackDirection(state.teams[carrier.team].defending)
 
   for (const defender of defenders) {
@@ -549,7 +560,7 @@ function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player
     }
     defender.vx = 0
     defender.vy = 0
-    defender.recovery = BREAKTHROUGH_RECOVERY
+    if (defender !== winner) defender.recovery = BREAKTHROUGH_RECOVERY
   }
 }
 
