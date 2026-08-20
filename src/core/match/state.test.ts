@@ -156,16 +156,21 @@ describe('possession', () => {
     return carrier
   }
 
-  it('keeps the ball with its carrier as they swim', () => {
+  it('keeps the ball glued to whoever is carrying it', () => {
     const state = newMatch('carry')
-    const carrier = runToPossession(state)
-    run(state, 120, { move: { x: 1, y: 0 } })
+    runToPossession(state)
 
-    expect(state.ball.carrier).toBe(carrier.id)
-    const held = carrierOf(state)!
-    expect(Math.hypot(state.ball.x - held.x, state.ball.y - held.y)).toBeLessThan(
-      PLAYER_RADIUS + BALL_RADIUS + 1.5,
-    )
+    // Possession legitimately changes hands via encounters, so this tracks the
+    // current carrier rather than assuming it is still the original one.
+    for (let i = 0; i < 600; i++) {
+      stepMatch(state, TICK, { move: { x: 1, y: 0 } })
+      const held = carrierOf(state)
+      if (!held) continue
+      expect(
+        Math.hypot(state.ball.x - held.x, state.ball.y - held.y),
+        `ball drifted from ${held.def.name}`,
+      ).toBeLessThan(PLAYER_RADIUS + BALL_RADIUS + 1.5)
+    }
   })
 
   it('gives the user the ball carrier when their team wins it', () => {

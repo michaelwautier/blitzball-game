@@ -30,9 +30,66 @@ export interface TeamState {
   score: number
 }
 
+/** What a carrier can do when defenders close in. */
+export type EncounterAction =
+  | { kind: 'breakthrough' }
+  | { kind: 'pass'; targetId: string }
+  | { kind: 'shoot' }
+
+export interface EncounterDefender {
+  id: string
+  /** AT rolled once when the encounter opens, so the odds cannot be re-rolled. */
+  attack: number
+}
+
+export interface EncounterResult {
+  action: EncounterAction['kind']
+  success: boolean
+  /** Line shown to the player, e.g. "EN 14 − AT 9 = 5 · broke through". */
+  summary: string
+}
+
+/**
+ * A carrier caught by defenders. Play freezes until the action is chosen, which
+ * is where blitzball stops being a swimming game and becomes a stat contest.
+ */
+export interface Encounter {
+  carrierId: string
+  defenders: EncounterDefender[]
+  /** Endurance the carrier brings into this exchange. */
+  endurance: number
+  /** Delay before an AI carrier commits, so its choice is readable. */
+  thinkTimer: number
+}
+
+/** A pass or shot travelling, still liable to be contested. */
+export interface BallFlight {
+  kind: 'pass' | 'shot'
+  fromTeam: TeamId
+  /** Intended receiver for a pass; null for a shot. */
+  targetId: string | null
+  target: Vec2
+  /** Remaining power. Hits zero and the ball drops short. */
+  power: number
+  /** Defenders who have already taken their bite, so nobody contests twice. */
+  contested: string[]
+}
+
+export type MatchPhase =
+  | { kind: 'play' }
+  | { kind: 'encounter'; encounter: Encounter }
+  | { kind: 'flight'; flight: BallFlight }
+  | { kind: 'celebration'; scorer: TeamId; timer: number }
+  | { kind: 'halfTime'; timer: number }
+  | { kind: 'fullTime' }
+
 export interface MatchState {
-  /** Simulated seconds since kickoff. */
+  /** Simulated seconds since the match began, including stoppages. */
   elapsed: number
+  /** Seconds left in the current half. Frozen while play is stopped. */
+  clock: number
+  half: 1 | 2
+  phase: MatchPhase
   rng: Rng
   teams: Record<TeamId, TeamState>
   players: Player[]
@@ -41,6 +98,20 @@ export interface MatchState {
   controlled: string
   /** Seconds until a loose ball may be collected, so a loss is not undone instantly. */
   pickupCooldown: number
+  /** Seconds before defenders may engage again, so a breakthrough has value. */
+  engageCooldown: number
+  /**
+   * Endurance left for the current possession, refreshed when it changes hands.
+   * Each breakthrough drains it, so a carrier cannot barge through forever.
+   */
+  endurance: number
+  /**
+   * Most recent notable event, for the on-screen banner. Kept out of the phase
+   * machine so a message can outlive the phase that produced it — a shot's
+   * summary should still be readable while the ball is in the air.
+   */
+  announcement: string | null
+  announcementTimer: number
 }
 
 /** Everything the simulation needs from the outside world in a tick. */

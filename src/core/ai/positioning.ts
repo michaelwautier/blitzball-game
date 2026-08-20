@@ -20,7 +20,17 @@ const BALL_PULL_Y = 0.45
 /** How many defenders leave their station to close down the carrier. */
 const CHASERS = 2
 
-/** How far from the carrier a closing defender tries to settle. */
+/**
+ * How far from the carrier a closing defender tries to settle.
+ *
+ * Kept inside `ENGAGE_RADIUS` so a marker who reaches its station is genuinely
+ * on the carrier. Setting it wider looks tidier but deadlocks: the station is
+ * relative to the carrier, so the marker simply backpedals as the carrier
+ * advances and contact never happens at all.
+ *
+ * Encounter frequency is governed by the grace periods after each outcome, not
+ * by holding defenders at arm's length.
+ */
 const MARKING_DISTANCE = PLAYER_RADIUS * 2
 
 export function steerByRole(state: MatchState, player: Player, dt: number): void {

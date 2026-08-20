@@ -26,6 +26,25 @@ export function distanceBetween(a: { x: number; y: number }, b: { x: number; y: 
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
+export function opponentOf(team: TeamId): TeamId {
+  return team === 'home' ? 'away' : 'home'
+}
+
+export function keeperFor(state: MatchState, team: TeamId): Player | undefined {
+  return state.players.find((p) => p.team === team && p.slot === 'GK')
+}
+
+/** Everyone on `team` bar the keeper and, optionally, one player to exclude. */
+export function outfieldTeammates(
+  state: MatchState,
+  team: TeamId,
+  exceptId?: string,
+): Player[] {
+  return state.players.filter(
+    (p) => p.team === team && p.slot !== 'GK' && p.id !== exceptId,
+  )
+}
+
 /**
  * The `count` players from `team` closest to `point`, nearest first, skipping
  * keepers so they are never dragged out of goal.

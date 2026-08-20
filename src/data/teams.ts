@@ -53,7 +53,7 @@ export const LUCA_GOERS: TeamDef = {
   colours: { primary: '#e05a47', secondary: '#2b2b33' },
   roster: [
     //                                          HP   SP  EN  AT  PA  BL  SH  CA
-    player('raudy', 'Raudy', 'GK', stats(230, 6, 13, 7, 5, 6, 3, 16)),
+    player('raudy', 'Raudy', 'GK', stats(230, 6, 13, 7, 5, 6, 3, 15)),
     player('doram', 'Doram', 'LD', stats(200, 9, 10, 12, 6, 11, 5, 1)),
     player('balgerda', 'Balgerda', 'RD', stats(205, 9, 10, 11, 7, 12, 6, 1)),
     player('bickson', 'Bickson', 'MF', stats(240, 13, 12, 8, 8, 5, 16, 1)),

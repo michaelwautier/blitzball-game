@@ -22,6 +22,7 @@ const COLOURS = {
   ball: '#ffffff',
   controlRing: '#ffffff',
   label: 'rgb(255 255 255 / 0.85)',
+  danger: '#ff8b7a',
 } as const
 
 /**
@@ -82,8 +83,68 @@ export class Renderer {
       if (player.slot !== 'GK') this.drawPlayer(state, player, alpha)
     }
 
+    this.drawEncounterFocus(state)
     this.drawBall(state, alpha)
     this.drawScoreboard(state, dpr)
+    this.drawBanner(state, dpr)
+  }
+
+  /**
+   * Ring the players locked in an encounter, so a frozen frame reads instantly:
+   * who has the ball, and who has them cornered.
+   */
+  private drawEncounterFocus(state: MatchState): void {
+    if (state.phase.kind !== 'encounter') return
+    const { ctx } = this
+    const { encounter } = state.phase
+
+    const carrier = state.players.find((p) => p.id === encounter.carrierId)
+    if (carrier) {
+      ctx.beginPath()
+      ctx.arc(carrier.x, carrier.y, PLAYER_RADIUS + 2.4, 0, Math.PI * 2)
+      ctx.strokeStyle = COLOURS.ball
+      ctx.lineWidth = 0.45
+      ctx.stroke()
+    }
+
+    for (const defender of encounter.defenders) {
+      const player = state.players.find((p) => p.id === defender.id)
+      if (!player) continue
+
+      ctx.beginPath()
+      ctx.arc(player.x, player.y, PLAYER_RADIUS + 2, 0, Math.PI * 2)
+      ctx.strokeStyle = COLOURS.danger
+      ctx.lineWidth = 0.45
+      ctx.stroke()
+
+      ctx.font = '600 2.6px ui-monospace, SFMono-Regular, Menlo, monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = COLOURS.danger
+      ctx.fillText(`AT ${defender.attack}`, player.x, player.y - PLAYER_RADIUS - 3)
+    }
+  }
+
+  /** Centre-screen message: goals, saves, half time, encounter outcomes. */
+  private drawBanner(state: MatchState, dpr: number): void {
+    if (!state.announcement) return
+    const { ctx } = this
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+    const emphatic = state.phase.kind === 'celebration' || state.phase.kind === 'fullTime'
+    ctx.font = emphatic
+      ? '700 48px ui-sans-serif, system-ui, sans-serif'
+      : '600 17px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    const y = emphatic ? this.height / 2 : this.height - 34
+    ctx.fillStyle = 'rgb(0 0 0 / 0.55)'
+    const width = ctx.measureText(state.announcement).width + 28
+    ctx.fillRect(this.width / 2 - width / 2, y - (emphatic ? 34 : 15), width, emphatic ? 68 : 30)
+
+    ctx.fillStyle = emphatic ? COLOURS.goal : COLOURS.label
+    ctx.fillText(state.announcement, this.width / 2, y)
   }
 
   private drawWater(): void {
@@ -220,9 +281,10 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     const { home, away } = state.teams
-    const minutes = Math.floor(state.elapsed / 60)
-    const seconds = Math.floor(state.elapsed % 60)
-    const clock = `${minutes}:${seconds.toString().padStart(2, '0')}`
+    // The clock counts down within the half, and stops while play is stopped.
+    const minutes = Math.floor(state.clock / 60)
+    const seconds = Math.floor(state.clock % 60)
+    const clock = `${minutes}:${seconds.toString().padStart(2, '0')}  ·  H${state.half}`
 
     ctx.font = '600 18px ui-monospace, SFMono-Regular, Menlo, monospace'
     ctx.textAlign = 'center'
