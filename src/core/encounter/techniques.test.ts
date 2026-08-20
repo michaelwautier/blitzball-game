@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { engagingDefenders, openEncounter, resolveEncounter, ENGAGE_RADIUS } from './encounter'
+import { ENGAGE_RADIUS, engagingDefenders, openEncounter, resolveEncounter } from './encounter'
 import { ACTION_HP_COST } from './formulas'
 import { createMatch, stepMatch } from '../match/state'
 import { giveBallTo } from '../match/possession'
@@ -180,33 +180,28 @@ describe('technique effects', () => {
     }
   })
 
-  it('poisons a defender who contests a Venom Pass', () => {
+  it('poisons the defenders a Venom Pass is threaded past', () => {
     const state = newMatch('venom-pass')
     const passer = find(state, 'home:wakka')
     const receiver = find(state, 'home:tidus')
-    passer.x = -20
-    passer.y = 0
     receiver.x = 20
     receiver.y = 0
 
-    const blocker = find(state, 'away:doram')
-    blocker.x = 0
+    const blocker = setUpEncounter(state, 'home:wakka', 1) && find(state, 'away:doram')
+    blocker.x = ENGAGE_RADIUS - 1
     blocker.y = 0
-    for (const other of state.players.filter((p) => p.team === 'away' && p.id !== blocker.id)) {
-      other.x = 45
-      other.y = 45
-    }
+    const engaged = engagingDefenders(state, passer)
+    expect(engaged.length).toBeGreaterThan(0)
 
-    giveBallTo(state, passer)
-    const encounter = openEncounter(state, passer, [])
+    const encounter = openEncounter(state, passer, engaged)
     resolveEncounter(state, encounter, {
       kind: 'pass',
       targetId: receiver.id,
       techniqueId: 'venom-pass',
     })
-    for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
-    expect(hasStatus(blocker, 'poison')).toBe(true)
+    // Every defender who tried to cut it out is poisoned, whether or not they did.
+    for (const defender of engaged) expect(hasStatus(defender, 'poison')).toBe(true)
   })
 
   it('fires a tackle technique automatically when the ball is won back', () => {

@@ -109,7 +109,7 @@ describe('bodies that are moved rather than swum', () => {
     state.ball.carrier = null
     state.ball.x = attacker.x
     state.ball.y = attacker.y
-    state.phase = { kind: 'flight', flight: startShot(state, attacker) }
+    state.phase = { kind: 'flight', flight: startShot(state, attacker, 40) }
 
     for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 

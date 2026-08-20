@@ -14,7 +14,7 @@ import type {
   Player,
 } from '../match/types'
 import { USER_TEAM } from '../match/types'
-import { ACTION_HP_COST, ROLL_HEADROOM, rollStat } from './formulas'
+import { ACTION_HP_COST, rollBounds, rollStat } from './formulas'
 import { findTechnique, techniquesOf, type Technique } from '../../data/techniques'
 import { applyStatus } from '../match/status'
 import { canAfford, effectiveStat, spendHp } from '../match/stats'
@@ -73,7 +73,11 @@ export function openEncounter(
 ): Encounter {
   return {
     carrierId: carrier.id,
-    defenders: defenders.map((d) => ({ id: d.id, attack: effectiveStat(d, 'at') })),
+    defenders: defenders.map((d) => ({
+      id: d.id,
+      attack: effectiveStat(d, 'at'),
+      block: effectiveStat(d, 'bl'),
+    })),
     kind: 'contested',
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
@@ -107,11 +111,24 @@ export function tackleRange(defenders: readonly EncounterDefender[]): {
   min: number
   max: number
 } {
+  return totalRange(defenders.map((d) => d.attack))
+}
+
+/** The same, for the blocking a pass or shot has to survive. */
+export function blockRange(defenders: readonly EncounterDefender[]): {
+  min: number
+  max: number
+} {
+  return totalRange(defenders.map((d) => d.block))
+}
+
+function totalRange(stats: readonly number[]): { min: number; max: number } {
   let min = 0
   let max = 0
-  for (const defender of defenders) {
-    min += defender.attack
-    max += defender.attack + Math.floor(defender.attack * ROLL_HEADROOM)
+  for (const stat of stats) {
+    const bounds = rollBounds(stat)
+    min += bounds.min
+    max += bounds.max
   }
   return { min, max }
 }
@@ -180,9 +197,9 @@ export function resolveEncounter(
     case 'breakthrough':
       return resolveBreakthrough(state, encounter, carrier)
     case 'pass':
-      return resolvePass(state, carrier, action.targetId, action.techniqueId)
+      return resolvePass(state, encounter, carrier, action.targetId, action.techniqueId)
     case 'shoot':
-      return resolveShoot(state, carrier, action.techniqueId)
+      return resolveShoot(state, encounter, carrier, action.techniqueId)
   }
 }
 
@@ -297,8 +314,45 @@ function useTackleTechnique(tackler: Player, victim: Player): Technique | null {
   return null
 }
 
+/**
+ * The defenders left of a pass or shot: their blocking, rolled, comes off it.
+ *
+ * Resolved defender by defender in order of proximity so, as with a tackle,
+ * whoever takes it to zero is the one who ends up with the ball. This is why
+ * stopping on the ball in space is worth so much — with nobody engaged there is
+ * nothing to subtract, and the throw faces only the distance.
+ */
+function contestThrow(
+  state: MatchState,
+  encounter: Encounter,
+  power: number,
+): { power: number; rolls: number[]; taker: Player | undefined } {
+  const rolls: number[] = []
+  let remaining = power
+
+  for (const engaged of encounter.defenders) {
+    const defender = playerById(state, engaged.id)
+    if (!defender) continue
+
+    const block = rollStat(effectiveStat(defender, 'bl'), state.rng)
+    remaining -= block
+    rolls.push(block)
+
+    if (remaining <= 0) return { power: remaining, rolls, taker: defender }
+  }
+
+  return { power: remaining, rolls, taker: undefined }
+}
+
+/** "PA 8 − 3 − 2 = 3", the arithmetic laid out as it happened. */
+function describeThrow(label: string, from: number, rolls: number[], to: number): string {
+  const steps = rolls.length > 0 ? ` − ${rolls.join(' − ')}` : ''
+  return `${label} ${from}${steps} = ${Math.max(0, Math.round(to))}`
+}
+
 function resolvePass(
   state: MatchState,
+  encounter: Encounter,
   carrier: Player,
   targetId: string,
   techniqueId: string | null,
@@ -311,35 +365,77 @@ function resolvePass(
   const technique = affordableTechnique(carrier, techniqueId, 'pass')
   spendHp(carrier, ACTION_HP_COST.pass + (technique?.hpCost ?? 0))
 
-  const flight = startPass(state, carrier, receiver, technique)
+  const start = effectiveStat(carrier, 'pa') + (technique?.power ?? 0)
+  const contest = contestThrow(state, encounter, start)
+  const name = technique ? `${technique.name} · ` : ''
+  const sums = describeThrow('PA', start, contest.rolls, contest.power)
+
+  // A pass technique's condition lands on everyone who tried to cut it out.
+  if (technique?.inflicts) {
+    for (const engaged of encounter.defenders) {
+      const defender = playerById(state, engaged.id)
+      if (defender) applyStatus(defender, technique.inflicts)
+    }
+  }
+
+  if (contest.taker) {
+    awardExp(state, contest.taker, 'interception')
+    giveBallTo(state, contest.taker)
+    return {
+      action: 'pass',
+      success: false,
+      summary: `${name}${sums} · ${contest.taker.def.name} intercepts!`,
+    }
+  }
+
   state.ball.carrier = null
-  state.phase = { kind: 'flight', flight }
+  state.phase = { kind: 'flight', flight: startPass(carrier, receiver, contest.power, technique) }
   state.engageCooldown = RESUME_GRACE
 
   return {
     action: 'pass',
     success: true,
-    summary: `${technique ? `${technique.name} · ` : ''}PA ${flight.power.toFixed(0)} · ${carrier.def.name} → ${receiver.def.name}`,
+    summary: `${name}${sums} · ${carrier.def.name} → ${receiver.def.name}`,
   }
 }
 
 function resolveShoot(
   state: MatchState,
+  encounter: Encounter,
   carrier: Player,
   techniqueId: string | null,
 ): EncounterResult {
   const technique = affordableTechnique(carrier, techniqueId, 'shoot')
   spendHp(carrier, ACTION_HP_COST.shoot + (technique?.hpCost ?? 0))
 
-  const flight = startShot(state, carrier, technique)
+  const start = effectiveStat(carrier, 'sh') + (technique?.power ?? 0)
+  // A technique that splits the defence waves that many of them through.
+  const facing = {
+    ...encounter,
+    defenders: encounter.defenders.slice(technique?.ignoresBlockers ?? 0),
+  }
+  const contest = contestThrow(state, facing, start)
+  const name = technique ? `${technique.name}! · ` : ''
+  const sums = describeThrow('SH', start, contest.rolls, contest.power)
+
+  if (contest.taker) {
+    awardExp(state, contest.taker, 'interception')
+    giveBallTo(state, contest.taker)
+    return {
+      action: 'shoot',
+      success: false,
+      summary: `${name}${sums} · blocked by ${contest.taker.def.name}`,
+    }
+  }
+
   state.ball.carrier = null
-  state.phase = { kind: 'flight', flight }
+  state.phase = { kind: 'flight', flight: startShot(state, carrier, contest.power, technique) }
   state.engageCooldown = RESUME_GRACE
 
   return {
     action: 'shoot',
     success: true,
-    summary: `${technique ? `${technique.name}! · ` : ''}SH ${flight.power.toFixed(0)} · ${carrier.def.name} shoots!`,
+    summary: `${name}${sums} · ${carrier.def.name} shoots!`,
   }
 }
 
