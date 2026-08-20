@@ -182,6 +182,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       stepPlay(state, dt, input)
       break
     case 'encounter':
+      holdStill(state)
       stepEncounter(state, dt, state.phase.encounter)
       break
     case 'flight': {
@@ -194,16 +195,34 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       break
     }
     case 'celebration':
+      holdStill(state)
       state.phase.timer -= dt
       if (state.phase.timer <= 0) resetForKickoff(state)
       break
     case 'halfTime':
+      holdStill(state)
       state.phase.timer -= dt
       if (state.phase.timer <= 0) startSecondHalf(state)
       break
     case 'fullTime':
+      holdStill(state)
       break
   }
+}
+
+/**
+ * Collapse the interpolation gap for everything on the pitch.
+ *
+ * The renderer draws each body between its previous and current position using
+ * the fraction of a tick elapsed. That is what keeps motion smooth — but in a
+ * phase where nothing moves, the previous position stays wherever the last
+ * moving tick left it, so the renderer sweeps back and forth across that gap
+ * every single frame. At a fraction of a unit it reads as a shimmer; after a
+ * position is set directly, it reads as the body being drawn in two places.
+ */
+function holdStill(state: MatchState): void {
+  for (const player of state.players) recordPrevious(player)
+  recordPrevious(state.ball)
 }
 
 function stepPlay(state: MatchState, dt: number, input: MatchInput): void {
