@@ -27,6 +27,15 @@ export interface Player extends Movable {
   /** Conditions currently affecting this player. */
   statuses: StatusEffect[]
   /**
+   * The challenge carrying a beaten defender past the player they went through.
+   *
+   * Null when they are not mid-tackle. Held as a movement rather than applied as
+   * a jump so the renderer interpolates it like any other travel — a defender
+   * teleporting from in front of the carrier to behind them reads as a glitch,
+   * not as being beaten.
+   */
+  lunge: Lunge | null
+  /**
    * Seconds this player is out of the play, having just been beaten.
    *
    * A tackle that fails carries the defender past the carrier and leaves them
@@ -34,6 +43,17 @@ export interface Player extends Movable {
    * what makes getting past someone worth the endurance it costs.
    */
   recovery: number
+}
+
+/** A defender's committed challenge, carrying them past the carrier. */
+export interface Lunge {
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  /** Seconds the movement takes. Recovery usually outlasts it. */
+  duration: number
+  elapsed: number
 }
 
 export interface Ball extends Movable {
