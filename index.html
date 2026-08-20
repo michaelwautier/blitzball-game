@@ -159,12 +159,89 @@
         font-size: 12px;
         opacity: 0.45;
       }
+
+      /* Full-time summary */
+      #summary {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 4px;
+        padding: 24px;
+        background: rgb(2 6 12 / 0.82);
+        backdrop-filter: blur(6px);
+        text-align: center;
+      }
+      .sum-score {
+        margin: 0;
+        font: 700 44px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.02em;
+      }
+      .sum-verdict {
+        margin-bottom: 18px;
+        font-size: 14px;
+        opacity: 0.6;
+      }
+      .sum-list {
+        list-style: none;
+        margin: 0 0 20px;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+        min-width: min(520px, calc(100vw - 48px));
+      }
+      .sum-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: baseline;
+        gap: 14px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgb(255 255 255 / 0.05);
+        text-align: left;
+        font-size: 14px;
+      }
+      .sum-name {
+        font-weight: 600;
+      }
+      .sum-exp {
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        opacity: 0.55;
+      }
+      .sum-level {
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--good);
+      }
+      .sum-gains {
+        grid-column: 1 / -1;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #9fe8ff;
+      }
+      .sum-empty {
+        padding: 8px;
+        font-size: 13px;
+        opacity: 0.5;
+      }
+      .sum-again {
+        justify-self: center;
+        padding: 10px 22px;
+        border: 1px solid var(--edge);
+        border-radius: 8px;
+        background: rgb(255 255 255 / 0.07);
+        color: inherit;
+        font: 600 14px ui-sans-serif, system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .sum-again:hover {
+        background: rgb(255 255 255 / 0.14);
+      }
     </style>
   </head>
   <body>
     <canvas id="game"></canvas>
     <pre id="debug"></pre>
     <div id="encounter" hidden></div>
+    <div id="summary" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

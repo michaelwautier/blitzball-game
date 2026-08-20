@@ -8,6 +8,7 @@ import {
   outfieldTeammates,
   playerById,
 } from '../match/queries'
+import { effectiveStat } from '../match/stats'
 import type { Encounter, EncounterAction, MatchState, Player } from '../match/types'
 
 /**
@@ -95,9 +96,9 @@ export function isShotWorthTaking(
   if (goalDistance > MAX_SHOOTING_RANGE) return false
   if (goalDistance <= POINT_BLANK_RANGE) return true
 
-  const power = carrier.def.stats.sh - goalDistance * SHOT_DECAY_PER_UNIT
+  const power = effectiveStat(carrier, 'sh') - goalDistance * SHOT_DECAY_PER_UNIT
   const keeper = keeperFor(state, opponentOf(carrier.team))
-  const catching = keeper?.def.stats.ca ?? 0
+  const catching = keeper ? effectiveStat(keeper, 'ca') : 0
 
   return power > catching * SHOOT_CONFIDENCE
 }
@@ -184,7 +185,7 @@ export function chooseTechnique(player: Player, kind: 'shoot' | 'pass'): string 
 
   for (const technique of techniquesOf(player.def.techniques, kind)) {
     const total = ACTION_HP_COST[kind] + technique.hpCost
-    const reserve = player.def.stats.hp * TECHNIQUE_HP_RESERVE_FRACTION
+    const reserve = player.stats.hp * TECHNIQUE_HP_RESERVE_FRACTION
     if (player.hp - total < reserve) continue
 
     const score = technique.power + (technique.inflicts ? 5 : 0) + technique.ignoresBlockers * 3

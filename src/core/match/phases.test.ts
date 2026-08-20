@@ -170,7 +170,7 @@ describe('ball in flight', () => {
     }
     // A keeper who cannot possibly reach it.
     const keeper = find(state, 'away:raudy')
-    keeper.def = { ...keeper.def, stats: { ...keeper.def.stats, ca: 0 } }
+    keeper.stats = { ...keeper.stats, ca: 0 }
 
     state.ball.carrier = null
     state.ball.x = shooter.x
@@ -212,7 +212,7 @@ describe('ball in flight', () => {
     }
     // An unbeatable keeper, back on the line where the shot is aimed.
     const keeper = find(state, 'away:raudy')
-    keeper.def = { ...keeper.def, stats: { ...keeper.def.stats, ca: 500 } }
+    keeper.stats = { ...keeper.stats, ca: 500 }
     keeper.x = 46
     keeper.y = 0
 

@@ -52,6 +52,15 @@ export interface PlayerDef {
   natural: PositionKey
   /** Base stats at level 1. */
   stats: PlayerStats
+  /**
+   * Stat points gained per level, as fractions.
+   *
+   * Fractional so a curve can express "gains SH roughly every other level"
+   * without any randomness: the fractions accumulate and the whole part is what
+   * a player actually has. This is what makes Tidus grow into a shooter and
+   * Jassu into a blocker rather than everyone converging on the same player.
+   */
+  growth: PlayerStats
   /** Ids of the techniques this player has learned. */
   techniques: readonly string[]
 }

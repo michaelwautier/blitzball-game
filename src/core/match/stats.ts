@@ -6,7 +6,7 @@ import type { Player } from './types'
  * What a player can actually produce right now.
  *
  * Every contested calculation reads stats through here rather than from
- * `player.def.stats`, so exhaustion and conditions apply everywhere at once and
+ * `player.stats`, so exhaustion and conditions apply everywhere at once and
  * the printed stat block stays a permanent description of the player.
  */
 
@@ -35,7 +35,7 @@ export function isAsleep(player: Player): boolean {
  * degenerating into free goals late on.
  */
 export function effectiveStat(player: Player, key: keyof PlayerStats): number {
-  const base = player.def.stats[key]
+  const base = player.stats[key]
   if (base <= 0) return 0
 
   let value = base * witherFactor(player, key)
@@ -48,7 +48,7 @@ export function effectiveStat(player: Player, key: keyof PlayerStats): number {
 /** The whole stat block, adjusted. Convenient where several stats are needed. */
 export function effectiveStats(player: Player): PlayerStats {
   return {
-    hp: player.def.stats.hp,
+    hp: player.stats.hp,
     sp: effectiveStat(player, 'sp'),
     en: effectiveStat(player, 'en'),
     at: effectiveStat(player, 'at'),
