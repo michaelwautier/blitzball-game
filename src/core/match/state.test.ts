@@ -133,11 +133,21 @@ describe('match simulation', () => {
   })
 
   it('diverges between seeds', () => {
-    const a = newMatch('besaid')
-    const b = newMatch('luca')
-    run(a, 1200)
-    run(b, 1200)
-    expect(positions(a)).not.toEqual(positions(b))
+    // Sampled across the run rather than at the final instant. A restart puts
+    // everyone on identical marks by design, so two matches that happen to have
+    // just conceded look the same in that one frame while having played out
+    // completely differently.
+    const trace = (seed: string) => {
+      const state = newMatch(seed)
+      const frames: string[] = []
+      for (let sample = 0; sample < 8; sample++) {
+        run(state, 150)
+        frames.push(JSON.stringify(positions(state)))
+      }
+      return frames
+    }
+
+    expect(trace('besaid')).not.toEqual(trace('luca'))
   })
 
   it('someone collects the loose kickoff within a few seconds', () => {
@@ -232,5 +242,83 @@ describe('kickoff reset', () => {
     const before = state.elapsed
     resetForKickoff(state)
     expect(state.elapsed).toBe(before)
+  })
+
+  it('hands the restart to the side that is named', () => {
+    const state = newMatch('restart')
+    resetForKickoff(state, 'away')
+
+    const carrier = state.players.find((p) => p.id === state.ball.carrier)
+    expect(carrier?.team).toBe('away')
+    expect(carrier?.slot).toBe('MF')
+    // On the spot, with the ball on them rather than adrift.
+    expect({ x: carrier!.x, y: carrier!.y }).toEqual({ x: 0, y: 0 })
+    expect({ x: state.ball.x, y: state.ball.y }).toEqual({ x: 0, y: 0 })
+  })
+
+  it('gives the restart taker their endurance and a moment on the ball', () => {
+    const state = newMatch('restart-grace')
+    resetForKickoff(state, 'home')
+
+    const carrier = state.players.find((p) => p.id === state.ball.carrier)!
+    expect(state.endurance).toBe(carrier.stats.en)
+    expect(state.engageCooldown).toBeGreaterThan(0)
+  })
+
+  it('leaves the restart taker still, not drifting from a scatter', () => {
+    const state = newMatch('restart-still')
+    resetForKickoff(state, 'home')
+    expect({ x: state.ball.vx, y: state.ball.vy }).toEqual({ x: 0, y: 0 })
+  })
+
+  it('does not steer the user onto a keeper or an opponent', () => {
+    const state = newMatch('restart-control')
+    resetForKickoff(state, 'away')
+
+    const controlled = state.players.find((p) => p.id === state.controlled)!
+    expect(controlled.team).toBe('home')
+    expect(controlled.slot).not.toBe('GK')
+  })
+})
+
+describe('who restarts after a goal', () => {
+  /** Score for `scorer`, then run out the celebration. */
+  function scoreAndRestart(seed: string, scorer: 'home' | 'away') {
+    const state = newMatch(seed)
+    state.teams[scorer].score += 1
+    state.phase = { kind: 'celebration', scorer, timer: 0.05 }
+    run(state, 30)
+    return state
+  }
+
+  it('gives it to the side that conceded, not the side that scored', () => {
+    for (const scorer of ['home', 'away'] as const) {
+      const state = scoreAndRestart(`conceded-${scorer}`, scorer)
+      const carrier = state.players.find((p) => p.id === state.ball.carrier)
+
+      expect(carrier, `nobody had the ball after ${scorer} scored`).toBeDefined()
+      expect(carrier!.team, `${scorer} scored and kept the ball`).not.toBe(scorer)
+    }
+  })
+
+  it('does not make the scorer race for it', () => {
+    // The whole point: a loose ball at the centre spot is a coin toss the
+    // scoring side wins half the time, and play clusters where it lands.
+    const state = scoreAndRestart('no-race', 'away')
+    expect(state.ball.carrier).not.toBeNull()
+  })
+
+  it('still opens each half with a blitzoff nobody owns', () => {
+    const state = newMatch('blitzoff')
+    expect(state.ball.carrier).toBeNull()
+
+    // And again at the break, where the ends swap.
+    state.half = 1
+    state.clock = 0
+    state.phase = { kind: 'halfTime', timer: 0.05 }
+    run(state, 30)
+
+    expect(state.half).toBe(2)
+    expect(state.ball.carrier).toBeNull()
   })
 })

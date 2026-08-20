@@ -210,21 +210,24 @@ describe('ball in flight', () => {
     expect(state.phase.kind).toBe('celebration')
   })
 
-  it('restarts from the centre after a goal', () => {
+  it('restarts from the centre after a goal, with the side that conceded', () => {
     const state = newMatch('restart')
     const scorer = find(state, 'home:tidus')
     scorer.x = 30
     scorer.y = 20
     state.phase = { kind: 'celebration', scorer: 'home', timer: 0.1 }
 
-    // Stop the moment play resumes: the kickoff ball has scatter and drifts.
     for (let i = 0; i < 30 && state.phase.kind === 'celebration'; i++) stepMatch(state, TICK)
 
     expect(state.phase.kind).toBe('play')
     expect(state.ball.x).toBe(0)
     expect(state.ball.y).toBe(0)
-    expect(state.ball.carrier).toBeNull()
-    // Everyone is back in their own half for the restart.
+
+    // Not a loose ball to race for: the side that conceded restarts with it.
+    const carrier = state.players.find((p) => p.id === state.ball.carrier)
+    expect(carrier?.team).toBe('away')
+
+    // And everyone else is back in their own half behind the restart.
     expect(scorer.x).toBeLessThan(0)
   })
 
