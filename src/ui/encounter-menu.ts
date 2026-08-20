@@ -34,6 +34,8 @@ export class EncounterMenu {
   private pendingTargetId: string | null = null
   /** Whether the carrier has anything to offer at the technique step. */
   private techniqueCounts = { pass: 0, shoot: 0 }
+  /** The open encounter allows passing only, as a keeper's does. */
+  private passOnly = false
 
   constructor(
     private readonly element: HTMLElement,
@@ -47,6 +49,12 @@ export class EncounterMenu {
     if (!this.isOpenFor(state)) {
       if (!this.element.hidden) this.close()
       return
+    }
+
+    // Opening fresh: a keeper distributing skips the action list entirely, since
+    // passing is the only thing they may do.
+    if (this.element.hidden && state.phase.kind === 'encounter') {
+      this.mode = state.phase.encounter.passOnly ? 'passTargets' : 'actions'
     }
 
     const signature = this.signatureFor(state)
@@ -87,6 +95,7 @@ export class EncounterMenu {
     this.signature = ''
     this.rows = []
     this.pendingTargetId = null
+    this.passOnly = false
   }
 
   private render(state: MatchState): void {
@@ -95,6 +104,7 @@ export class EncounterMenu {
     const carrier = playerById(state, encounter.carrierId)
     if (!carrier) return
 
+    this.passOnly = encounter.passOnly
     this.techniqueCounts = {
       pass: techniquesOf(carrier.def.techniques, 'pass').length,
       shoot: techniquesOf(carrier.def.techniques, 'shoot').length,
@@ -107,7 +117,9 @@ export class EncounterMenu {
 
     const heading = document.createElement('div')
     heading.className = 'enc-heading'
-    heading.textContent = `${carrier.def.name} is caught by ${names}`
+    heading.textContent = encounter.passOnly
+      ? `${carrier.def.name} has it — find a teammate`
+      : `${carrier.def.name} is caught by ${names}`
 
     const hp = document.createElement('span')
     hp.className = 'enc-hp'
@@ -117,7 +129,8 @@ export class EncounterMenu {
     const odds = document.createElement('div')
     odds.className = 'enc-odds'
     const survives = encounter.endurance - attack
-    odds.innerHTML =
+    if (encounter.passOnly) odds.innerHTML = '<span class="enc-vs">Distributing from the line</span>'
+    else odds.innerHTML =
       `<span class="enc-en">EN ${encounter.endurance}</span>` +
       `<span class="enc-vs">vs</span>` +
       `<span class="enc-at">AT ${attack}</span>` +
@@ -133,7 +146,7 @@ export class EncounterMenu {
     const hint = document.createElement('div')
     hint.className = 'enc-hint'
     hint.textContent =
-      this.mode === 'actions'
+      this.mode === 'actions' || (this.mode === 'passTargets' && this.passOnly)
         ? `Press 1–${this.rows.length}, or click`
         : `Press 1–${this.rows.length}, Esc to go back`
 
@@ -258,8 +271,12 @@ export class EncounterMenu {
     if (this.element.hidden) return
 
     if (event.key === 'Escape' && this.mode !== 'actions') {
-      this.mode = this.mode === 'passTechnique' ? 'passTargets' : 'actions'
-      this.signature = ''
+      const back = this.mode === 'passTechnique' ? 'passTargets' : 'actions'
+      // A keeper has no action list to return to.
+      if (!(back === 'actions' && this.passOnly)) {
+        this.mode = back
+        this.signature = ''
+      }
       event.preventDefault()
       return
     }

@@ -51,6 +51,8 @@ export function chooseEncounterAction(
   const carrier = playerById(state, encounter.carrierId)
   if (!carrier) return { kind: 'breakthrough' }
 
+  if (encounter.passOnly) return chooseDistribution(state, carrier)
+
   const goalDistance = distanceToOpposingGoal(state, carrier)
   const incoming = encounter.defenders.reduce((total, d) => total + d.attack, 0)
   const canBreakThrough = encounter.endurance - incoming > BREAKTHROUGH_MARGIN
@@ -192,4 +194,41 @@ export function chooseTechnique(player: Player, kind: 'shoot' | 'pass'): string 
   }
 
   return best
+}
+
+/**
+ * Who a keeper restarts play to.
+ *
+ * Unlike an open-play pass this cannot decline to happen, so it never returns
+ * empty: it prefers a teammate who is both unmarked and upfield, but will settle
+ * for the nearest body rather than leave the keeper holding the ball forever.
+ */
+export function chooseDistribution(state: MatchState, keeper: Player): EncounterAction {
+  const mates = outfieldTeammates(state, keeper.team, keeper.id)
+  const keeperGoalDistance = distanceToOpposingGoal(state, keeper)
+
+  let best: Player | undefined
+  let bestScore = -Infinity
+
+  for (const mate of mates) {
+    const advance = keeperGoalDistance - distanceToOpposingGoal(state, mate)
+    // Being unmarked dominates: a keeper's pass is the one place on the pitch
+    // where losing the ball concedes immediately. Among safe options, get it as
+    // far upfield as possible — a short ball to a defender still inside their
+    // own third simply hands the pressure straight back.
+    const score =
+      advance - distanceBetween(keeper, mate) * 0.15 - (isCovered(state, mate) ? 30 : 0)
+
+    if (score > bestScore) {
+      bestScore = score
+      best = mate
+    }
+  }
+
+  const receiver = best ?? mates[0]
+  return {
+    kind: 'pass',
+    targetId: receiver?.id ?? '',
+    techniqueId: receiver ? chooseTechnique(keeper, 'pass') : null,
+  }
 }
