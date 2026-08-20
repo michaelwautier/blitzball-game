@@ -22,10 +22,10 @@ import {
   steerWithIntent,
   type Movable,
 } from './movement'
-import { collectLooseBall } from './possession'
+import { collectLooseBall, giveBallTo } from './possession'
 import { tickStatuses } from './status'
 import { HP_REGEN_PER_SECOND } from '../encounter/formulas'
-import { carrierOf, playerById, speedOf } from './queries'
+import { carrierOf, opponentOf, playerById, speedOf } from './queries'
 import {
   NO_INPUT,
   USER_TEAM,
@@ -133,7 +133,20 @@ function buildSide(team: TeamState, careers: CareerLookup): Player[] {
 }
 
 /** Return every player to their kickoff spot and drop the ball at the centre. */
-export function resetForKickoff(state: MatchState): void {
+/**
+ * Put everyone back on their marks and restart play.
+ *
+ * `possession` decides how. With nobody named the ball is tossed into the middle
+ * for both sides to race — FFX's blitzoff, and how each half begins. Named, that
+ * side restarts with the ball, which is what happens after a goal: the side that
+ * just scored does not get it back.
+ *
+ * Racing for it after a goal reads as neutral and is not. The scorer wins that
+ * race half the time, and since play clusters around wherever the ball lands, a
+ * strong side could chain a goal into the next one while the side being beaten
+ * never got the ball at all.
+ */
+export function resetForKickoff(state: MatchState, possession: TeamId | null = null): void {
   for (const player of state.players) {
     const spot = kickoffPosition(player.slot, state.teams[player.team].defending)
     player.x = spot.x
@@ -151,16 +164,42 @@ export function resetForKickoff(state: MatchState): void {
   ball.y = 0
   ball.prevX = 0
   ball.prevY = 0
-  // A touch of scatter so a kickoff is never a perfectly symmetrical race.
-  ball.vx = state.rng.range(-1.5, 1.5)
-  ball.vy = state.rng.range(-1.5, 1.5)
   ball.carrier = null
+  ball.vx = 0
+  ball.vy = 0
 
   state.pickupCooldown = 0
   state.engageCooldown = 0
   state.endurance = 0
   state.phase = { kind: 'play' }
+
+  const taker = possession ? restartTaker(state, possession) : undefined
+  if (taker) {
+    // Up to the centre spot to restart, with everyone else still behind their
+    // own kickoff line, so the restart is not immediately contested.
+    taker.x = 0
+    taker.y = 0
+    taker.prevX = 0
+    taker.prevY = 0
+    // Brings the ball, the endurance refresh and the possession grace with it.
+    giveBallTo(state, taker)
+  } else {
+    // A touch of scatter so a kickoff is never a perfectly symmetrical race.
+    ball.vx = state.rng.range(-1.5, 1.5)
+    ball.vy = state.rng.range(-1.5, 1.5)
+  }
+
   updateControlled(state)
+}
+
+/**
+ * Who takes the restart: that side's midfielder.
+ *
+ * The same slot for every team, so a restart is predictable rather than
+ * depending on who happened to be nearest when the ball went in.
+ */
+function restartTaker(state: MatchState, team: TeamId): Player | undefined {
+  return state.players.find((player) => player.team === team && player.slot === 'MF')
 }
 
 /** Post a message for the on-screen banner. */
@@ -202,7 +241,8 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
     case 'celebration':
       holdStill(state)
       state.phase.timer -= dt
-      if (state.phase.timer <= 0) resetForKickoff(state)
+      // The side that conceded restarts with it; the scorer does not get it back.
+      if (state.phase.timer <= 0) resetForKickoff(state, opponentOf(state.phase.scorer))
       break
     case 'halfTime':
       holdStill(state)

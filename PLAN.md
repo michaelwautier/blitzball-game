@@ -34,6 +34,9 @@ stale — fix it.
 - Free play: the ball carrier is user-controlled; teammates and opponents are AI-positioned.
   Three defenders break off to close the carrier down; **at most two may engage them at once**
   (`MAX_ENGAGED`), the third being cover rather than a challenge.
+- **Restarts:** each half opens with a blitzoff — the ball loose at the centre spot with a
+  little scatter, both sides racing. After a goal it is not a race: the side that conceded
+  restarts with the ball on the spot, everyone else behind their own kickoff line.
 - **Encounter:** when defenders reach the carrier, the game pauses and shows the menu —
   Breakthrough, Pass, or Shoot, plus a choice of how many defenders to clear first and which
   technique to spend HP on. Defenders spend a different stat depending on what you chose:
@@ -144,11 +147,11 @@ against the ladder alone.
    options are named — "No Break / Break to Deim / Break to Deim & Vuroja" — cumulatively and
    nearest-first, matching the order they are actually challenged in. The emphatic goal banner
    stays centred.
-2. **The conceding team takes the restart.** After a goal, `resetForKickoff` hands the ball to
-   `opponentOf(scorer)`'s MF at centre instead of racing a scattered loose ball — the scorer
-   winning that race half the time was a compounding unfairness. Each half still opens with
-   the neutral scatter, which is the blitzoff. Measured on the ladder; mismatches should
-   compress.
+2. **The conceding team takes the restart** ✅ (#31). After a goal, `resetForKickoff` hands the
+   ball to `opponentOf(scorer)`'s MF on the centre spot instead of racing a scattered loose
+   ball — the scorer winning that race half the time was a compounding unfairness, since play
+   clusters wherever the ball lands. Each half still opens with the neutral scatter, which is
+   the blitzoff. It compressed the extremes as intended: see *Balance*.
 3. **The FFX breakthrough flow.** Breaking past defenders becomes a *step inside* the
    encounter rather than a bundle on the throw: `breakthrough` takes a depth (challenge the
    nearest k), clearing everyone resumes play, clearing some keeps the encounter open against
@@ -200,6 +203,17 @@ crowd: three defenders engaged every carrier, blocking and tackling both sum acr
 engaged, and a level-one carrier had no route out of that arithmetic. Capping engagement at
 two, halving the second blocker, having the AI clear defenders before throwing, and flooring
 the keeper's catch turned it into a league the Aurochs can compete in.
+
+Giving the restart to the side that conceded (#31) was measured the same way, and did what a
+comeback mechanism should — it compressed the extremes without reordering the table:
+
+```
+             before        after
+PSY  conceded      6           32
+BES  conceded    341          304
+BES  scored      113          124
+goalless         27%          27%     (2.46 goals/match)
+```
 
 The most sensitive numbers, in order: `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT`, and the
 blocker coverage weights. Small moves in any of them swing the whole board — change one at a
