@@ -6,16 +6,25 @@
  * and right (+x); the halfway line is the vertical diameter at x = 0.
  */
 
-export const POOL_RADIUS = 50
+/**
+ * Radius of the playable circle.
+ *
+ * Everything below is expressed as a fraction of it, and the speed and decay
+ * constants elsewhere are scaled to match, so this is the one number to change
+ * to give players more or less room. Bodies deliberately do *not* scale with it:
+ * that is what turns a bigger pool into more space rather than the same game
+ * drawn larger.
+ */
+export const POOL_RADIUS = 110
 
 /** Distance from the origin to each goal line. Sits just inside the boundary. */
-export const GOAL_X = 46
+export const GOAL_X = POOL_RADIUS * 0.92
 
 /** Half-height of the goal mouth, measured along y from the centre. */
 export const GOAL_HALF_HEIGHT = 7
 
 /** Radius of the centre circle drawn at kickoff. */
-export const CENTRE_CIRCLE_RADIUS = 8
+export const CENTRE_CIRCLE_RADIUS = POOL_RADIUS * 0.16
 
 export const BALL_RADIUS = 1.1
 

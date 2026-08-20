@@ -1,3 +1,5 @@
+import { POOL_RADIUS } from '../pitch'
+import { REFERENCE_POOL_RADIUS } from '../match/movement'
 import type { Rng } from '../rng'
 
 /**
@@ -29,10 +31,10 @@ export const ROLL_MAX = 1.5
  * into it directly. The rate is ours — the source gives no number — set so a
  * low-level passer can reliably find someone nearby but not across the pool.
  */
-export const PASS_DECAY_PER_UNIT = 0.06
+export const PASS_DECAY_PER_UNIT = 0.06 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /** Power a shot loses per world unit travelled. Steeper, so range matters more. */
-export const SHOT_DECAY_PER_UNIT = 0.3
+export const SHOT_DECAY_PER_UNIT = 0.3 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /**
  * Roll a contested stat: between half and one and a half times its value.

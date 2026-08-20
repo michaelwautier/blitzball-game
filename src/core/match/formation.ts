@@ -1,5 +1,6 @@
 import {
   CENTRE_CIRCLE_RADIUS,
+  GOAL_HALF_HEIGHT,
   GOAL_X,
   POOL_RADIUS,
   clampToPool,
@@ -17,12 +18,12 @@ import type { PositionKey } from '../../data/types'
  * attention; `desiredPosition` in the AI shifts them around play from here.
  */
 const ANCHORS: Readonly<Record<PositionKey, Vec2>> = {
-  GK: { x: -GOAL_X + 3, y: 0 },
-  LD: { x: -26, y: -13 },
-  RD: { x: -26, y: 13 },
-  MF: { x: -4, y: 0 },
-  LF: { x: 18, y: -15 },
-  RF: { x: 18, y: 15 },
+  GK: { x: -GOAL_X + POOL_RADIUS * 0.06, y: 0 },
+  LD: { x: POOL_RADIUS * -0.52, y: POOL_RADIUS * -0.26 },
+  RD: { x: POOL_RADIUS * -0.52, y: POOL_RADIUS * 0.26 },
+  MF: { x: POOL_RADIUS * -0.08, y: 0 },
+  LF: { x: POOL_RADIUS * 0.36, y: POOL_RADIUS * -0.3 },
+  RF: { x: POOL_RADIUS * 0.36, y: POOL_RADIUS * 0.3 },
 }
 
 /** Where a player in `slot` sits when their team defends `defending`. */
@@ -49,7 +50,7 @@ const KICKOFF_STANDOFF = CENTRE_CIRCLE_RADIUS + 1
 export function kickoffPosition(slot: PositionKey, defending: Side): Vec2 {
   const anchor = anchorFor(slot, defending)
   const towardsOwnGoal = -attackDirection(defending)
-  const pullback = slot === 'GK' ? 0 : 10
+  const pullback = slot === 'GK' ? 0 : POOL_RADIUS * 0.2
   const x = anchor.x + towardsOwnGoal * pullback
 
   const ownHalf =
@@ -61,7 +62,7 @@ export function kickoffPosition(slot: PositionKey, defending: Side): Vec2 {
 /** Keepers hold the goal line rather than roaming; they only track the ball's y. */
 export function keeperPosition(defending: Side, ballY: number): Vec2 {
   const anchor = anchorFor('GK', defending)
-  const reach = 9
+  const reach = GOAL_HALF_HEIGHT * 1.25
   return {
     x: anchor.x,
     y: Math.max(-reach, Math.min(reach, ballY)),

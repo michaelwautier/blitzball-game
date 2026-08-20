@@ -1,7 +1,7 @@
-import { GOAL_HALF_HEIGHT, clampToPool, goalLineX, type Vec2 } from '../pitch'
+import { GOAL_HALF_HEIGHT, POOL_RADIUS, clampToPool, goalLineX, type Vec2 } from '../pitch'
 import { PASS_DECAY_PER_UNIT, SHOT_DECAY_PER_UNIT, rollStat } from '../encounter/formulas'
 import { attackDirection } from './formation'
-import { PLAYER_RADIUS, recordPrevious } from './movement'
+import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS, recordPrevious } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
 import { giveBallTo } from './possession'
 import { awardExp } from './exp'
@@ -11,7 +11,7 @@ import type { Technique } from '../../data/techniques'
 import type { BallFlight, MatchState, Player, TeamId } from './types'
 
 /** How fast a pass or shot travels, in world units per second. */
-export const FLIGHT_SPEED = 46
+export const FLIGHT_SPEED = 46 * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
 
 /**
  * Launch a pass towards a teammate.
@@ -217,7 +217,7 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
 export const CELEBRATION_SECONDS = 2.2
 
 /** Attackers are cleared out to this distance when a keeper claims the ball. */
-export const KEEPER_CLEARANCE_RADIUS = 16
+export const KEEPER_CLEARANCE_RADIUS = POOL_RADIUS * 0.32
 
 /** Seconds a keeper gets to distribute before anyone may close them down. */
 export const KEEPER_CLEARANCE_GRACE = 3

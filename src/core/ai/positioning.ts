@@ -1,4 +1,4 @@
-import { GOAL_X, clampToPool, type Vec2 } from '../pitch'
+import { GOAL_X, POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
 import { anchorFor, attackDirection, keeperPosition } from '../match/formation'
 import { PLAYER_RADIUS, steerTowards } from '../match/movement'
 import { carrierOf, distanceBetween, nearestOutfielders, speedOf } from '../match/queries'
@@ -98,7 +98,7 @@ function markingSpot(state: MatchState, carrier: Player, rank: number): Vec2 {
 function supportingSpot(state: MatchState, player: Player, attacking: boolean): Vec2 {
   const anchor = anchorFor(player.slot, state.teams[player.team].defending)
   const forward = attackDirection(state.teams[player.team].defending)
-  const push = attacking ? 8 : 0
+  const push = attacking ? POOL_RADIUS * 0.16 : 0
 
   return clampToPool(
     {

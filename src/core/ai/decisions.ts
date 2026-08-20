@@ -1,4 +1,4 @@
-import { GOAL_HALF_HEIGHT, goalLineX } from '../pitch'
+import { GOAL_HALF_HEIGHT, POOL_RADIUS, goalLineX } from '../pitch'
 import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
 import { ENGAGE_RADIUS, blockRange, tackleRange } from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
@@ -29,7 +29,7 @@ import type { Encounter, EncounterAction, MatchState, Player } from '../match/ty
 const SHOOT_CONFIDENCE = 0.95
 
 /** Never shoot from beyond this, whatever the arithmetic says. */
-const MAX_SHOOTING_RANGE = 34
+const MAX_SHOOTING_RANGE = POOL_RADIUS * 0.68
 
 /**
  * Inside this range, shoot regardless of the odds.
@@ -38,10 +38,10 @@ const MAX_SHOOTING_RANGE = 34
  * forever rather than ever testing the keeper, which is both bad football and a
  * stalemate the other team cannot break.
  */
-const POINT_BLANK_RANGE = 8
+const POINT_BLANK_RANGE = POOL_RADIUS * 0.16
 
 /** A cornered carrier will only chance a speculative shot from inside this range. */
-const DESPERATION_RANGE = 20
+const DESPERATION_RANGE = POOL_RADIUS * 0.4
 
 /** Endurance must exceed the incoming tackle by this much to risk a barge. */
 const BREAKTHROUGH_MARGIN = 4

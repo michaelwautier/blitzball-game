@@ -24,7 +24,7 @@ import {
 import { collectLooseBall } from './possession'
 import { tickStatuses } from './status'
 import { HP_REGEN_PER_SECOND } from '../encounter/formulas'
-import { carrierOf, speedOf } from './queries'
+import { carrierOf, playerById, speedOf } from './queries'
 import {
   NO_INPUT,
   USER_TEAM,
@@ -155,7 +155,7 @@ export function resetForKickoff(state: MatchState): void {
   state.engageCooldown = 0
   state.endurance = 0
   state.phase = { kind: 'play' }
-  state.controlled = chooseControlled(state)
+  updateControlled(state)
 }
 
 /** Post a message for the on-screen banner. */
@@ -191,7 +191,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       updateCondition(state, dt)
       movePlayers(state, dt, input)
       stepFlight(state, flight, dt)
-      state.controlled = chooseControlled(state)
+      updateControlled(state)
       break
     }
     case 'celebration':
@@ -236,7 +236,7 @@ function stepPlay(state: MatchState, dt: number, input: MatchInput): void {
   movePlayers(state, dt, input)
   updateBall(state, dt)
   maybeOpenEncounter(state)
-  state.controlled = chooseControlled(state)
+  updateControlled(state)
 }
 
 /**
@@ -413,27 +413,65 @@ function applyEncounterAction(
 }
 
 /**
- * Pick the user's active player: whoever holds the ball, else the outfielder
- * best placed to win it. Keepers are never handed over — pulling one off its
- * line would be a gift to the opposition.
+ * Keep the user's active player current.
+ *
+ * Exactly one case is automatic: holding the ball means steering it, so control
+ * follows possession onto the carrier. Everything else is sticky. Reassigning to
+ * whoever happened to be nearest the ball each tick meant control skipped
+ * between defenders constantly, which made defending feel like it was happening
+ * to you rather than being something you did — use `switchControlled` instead.
+ *
+ * A keeper on the ball is never handed over: they are rooted to their line and
+ * distribute through the menu, so there is nothing to steer.
  */
-function chooseControlled(state: MatchState): string {
+function updateControlled(state: MatchState): void {
   const carrier = carrierOf(state)
-  // A keeper on the ball is never handed over: they are rooted to their line and
-  // distribute through the menu, so there is nothing for the user to steer.
-  if (carrier?.team === USER_TEAM && carrier.slot !== 'GK') return carrier.id
+  if (carrier?.team === USER_TEAM && carrier.slot !== 'GK') {
+    state.controlled = carrier.id
+    return
+  }
 
+  const current = playerById(state, state.controlled)
+  if (current && current.team === USER_TEAM && current.slot !== 'GK') return
+
+  // Nothing valid held — at kickoff, or after the keeper had it.
+  state.controlled = nearestTo(state, state.ball)?.id ?? state.controlled
+}
+
+/**
+ * Hand control to whoever is best placed to challenge the player on the ball.
+ *
+ * The defensive equivalent of possession following the carrier: rather than the
+ * game deciding for you, this is the button that says "give me the one who can
+ * actually get there".
+ */
+export function switchControlled(state: MatchState): boolean {
+  const carrier = carrierOf(state)
+  // Nothing to chase down when the ball is already ours.
+  if (carrier?.team === USER_TEAM) return false
+
+  const target = carrier ?? state.ball
+  const best = nearestTo(state, target)
+  if (!best || best.id === state.controlled) return false
+
+  state.controlled = best.id
+  return true
+}
+
+/** The user's closest outfielder to a point. Keepers stay on their line. */
+function nearestTo(state: MatchState, point: { x: number; y: number }): Player | undefined {
   let best: Player | undefined
   let bestDistance = Infinity
+
   for (const player of state.players) {
     if (player.team !== USER_TEAM || player.slot === 'GK') continue
-    const distance = Math.hypot(player.x - state.ball.x, player.y - state.ball.y)
+    const distance = Math.hypot(player.x - point.x, player.y - point.y)
     if (distance < bestDistance) {
       bestDistance = distance
       best = player
     }
   }
-  return best?.id ?? state.controlled
+  return best
 }
 
 function updateBall(state: MatchState, dt: number): void {
