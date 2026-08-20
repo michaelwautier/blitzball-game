@@ -2,6 +2,7 @@ import { GOAL_X, POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
 import { anchorFor, attackDirection, keeperPosition } from '../match/formation'
 import { PLAYER_RADIUS, steerTowards } from '../match/movement'
 import { carrierOf, distanceBetween, nearestOutfielders, speedOf } from '../match/queries'
+import { SHOOTING_STANDOFF } from './decisions'
 import type { MatchState, Player } from '../match/types'
 
 /**
@@ -17,8 +18,14 @@ import type { MatchState, Player } from '../match/types'
 const BALL_PULL_X = 0.3
 const BALL_PULL_Y = 0.45
 
-/** How many defenders leave their station to close down the carrier. */
-const CHASERS = 2
+/**
+ * How many defenders leave their station to close down the carrier.
+ *
+ * Three rather than two since the pool was enlarged: with the same-sized bodies
+ * covering a much larger pitch, two defenders left attackers running clear and
+ * scoring roughly doubled. Still short of the whole side, so shape is kept.
+ */
+export const CHASERS = 3
 
 /**
  * How far from the carrier a closing defender tries to settle.
@@ -65,10 +72,19 @@ export function desiredPosition(state: MatchState, player: Player): Vec2 {
   return supportingSpot(state, player, carrier?.team === player.team)
 }
 
-/** An AI carrier heads for the opposing goal. */
+/**
+ * An AI carrier heads for the opposing goal, and stops short of it.
+ *
+ * Aiming at the goal line itself walked attackers into the net, where they had
+ * nothing to do but wait to be tackled. They now pull up at the distance they
+ * are willing to shoot from.
+ */
 function driveTowardsGoal(state: MatchState, player: Player): Vec2 {
   const forward = attackDirection(state.teams[player.team].defending)
-  return clampToPool({ x: forward * GOAL_X, y: state.ball.y * 0.35 }, PLAYER_RADIUS)
+  return clampToPool(
+    { x: forward * (GOAL_X - SHOOTING_STANDOFF), y: state.ball.y * 0.35 },
+    PLAYER_RADIUS,
+  )
 }
 
 /**

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { Squad } from './squad'
 import { currentStats, expForNextLevel } from './career'
 import { EXP_AWARDS } from './awards'
-import { createMatch, stepMatch, submitEncounterAction } from '../match/state'
+import { createMatch, requestActionMenu, stepMatch, submitEncounterAction } from '../match/state'
 import { awardExp } from '../match/exp'
-import { chooseEncounterAction } from '../ai/decisions'
+import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
 import { autoIntent } from '../ai/autopilot'
 import { HALF_SECONDS } from '../match/state'
 import { USER_TEAM, type MatchState } from '../match/types'
@@ -21,6 +21,17 @@ function playOut(state: MatchState): void {
   const limit = Math.ceil((HALF_SECONDS * 2 + 120) / TICK)
   for (let i = 0; i < limit && state.phase.kind !== 'fullTime'; i++) {
     stepMatch(state, TICK, autoIntent(state))
+
+    const onBall = state.players.find((p) => p.id === state.ball.carrier)
+    if (
+      state.phase.kind === 'play' &&
+      onBall?.team === USER_TEAM &&
+      onBall.slot !== 'GK' &&
+      shouldStopAndShoot(state, onBall)
+    ) {
+      requestActionMenu(state)
+    }
+
     if (state.phase.kind === 'encounter') {
       const { encounter } = state.phase
       const carrier = state.players.find((p) => p.id === encounter.carrierId)
