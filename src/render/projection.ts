@@ -4,13 +4,16 @@ import type { Vec2 } from '../core/pitch'
  * How the simulation's flat pitch sits in the 3D scene.
  *
  * The simulation is two-dimensional and stays that way: this maps its plane into
- * the world so the scene can be drawn around it. Play occupies the vertical
- * plane facing the camera — goals left and right, up is up — which is the view
- * FFX shows, with the sphere of water built around it rather than the pitch
- * being laid flat like a swimming pool seen from above.
+ * the world so the scene can be drawn around it.
  *
- * Simulation y runs downward, in the screen convention the 2D renderer uses, so
- * it is negated here rather than in every call site.
+ * Play lies flat, on the equator of the sphere: pitch x runs left to right with
+ * the goals at either end, and pitch y runs away from and towards the camera.
+ * That is what lets a broadcast camera sit low and look across the pool, with
+ * the far wall of the sphere rising behind play as a horizon. Standing the pitch
+ * up to face the camera instead — the obvious reading of a flat simulation —
+ * makes it a wall, and no camera angle rescues that.
+ *
+ * `y` is therefore elevation, which everything on the pitch shares.
  */
 export interface Vec3 {
   x: number
@@ -24,14 +27,14 @@ export interface Vec3 {
  */
 const unsigned = (n: number): number => (n === 0 ? 0 : n)
 
-/** A point on the pitch, in scene coordinates. */
-export function toScene(point: Vec2, depth = 0): Vec3 {
-  return { x: unsigned(point.x), y: unsigned(-point.y), z: depth }
+/** A point on the pitch, in scene coordinates. `height` lifts it off the plane. */
+export function toScene(point: Vec2, height = 0): Vec3 {
+  return { x: unsigned(point.x), y: height, z: unsigned(point.y) }
 }
 
 /** The inverse, for turning something in the scene back into pitch terms. */
 export function fromScene(point: Vec3): Vec2 {
-  return { x: unsigned(point.x), y: unsigned(-point.y) }
+  return { x: unsigned(point.x), y: unsigned(point.z) }
 }
 
 /**
@@ -44,11 +47,11 @@ export function interpolateToScene(
   previous: Vec2,
   current: Vec2,
   alpha: number,
-  depth = 0,
+  height = 0,
 ): Vec3 {
   return {
     x: unsigned(previous.x + (current.x - previous.x) * alpha),
-    y: unsigned(-(previous.y + (current.y - previous.y) * alpha)),
-    z: depth,
+    y: height,
+    z: unsigned(previous.y + (current.y - previous.y) * alpha),
   }
 }

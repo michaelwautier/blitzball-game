@@ -1,6 +1,6 @@
-import { clampToPool } from '../pitch'
+import { POOL_RADIUS, clampToPool } from '../pitch'
 import { attackDirection } from '../match/formation'
-import { PLAYER_RADIUS, recordPrevious } from '../match/movement'
+import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS, recordPrevious } from '../match/movement'
 import { distanceBetween, opponentOf, playerById } from '../match/queries'
 import { giveBallTo } from '../match/possession'
 import { startPass, startShot } from '../match/flight'
@@ -24,10 +24,17 @@ import { awardExp } from '../match/exp'
  * How close a defender must be to drag the carrier into an encounter.
  *
  * Must exceed the separation floor of `PLAYER_RADIUS * 2`, or bodies could never
- * get close enough to trigger one, and must stay under `MARKING_DISTANCE` so a
- * defender at its marking station is not already on top of the carrier.
+ * get close enough to trigger one, and must stay above `MARKING_DISTANCE` so a
+ * defender at its marking station is genuinely on the carrier.
+ *
+ * Grows with the square root of the pool rather than not at all. Bodies staying
+ * the same size is what turns a bigger pool into more room, but leaving reach
+ * fixed as well meant defenders covered so much less of it that scoring rose by
+ * half. The square root splits the difference: still markedly more space, without
+ * the defence being spread to nothing.
  */
-export const ENGAGE_RADIUS = PLAYER_RADIUS * 2.3
+export const ENGAGE_RADIUS =
+  PLAYER_RADIUS * 2.3 * Math.sqrt(POOL_RADIUS / REFERENCE_POOL_RADIUS)
 
 /** Seconds an AI carrier appears to deliberate, so its choice is readable. */
 export const AI_THINK_SECONDS = 0.35

@@ -5,6 +5,7 @@ import {
   requestActionMenu,
   stepMatch,
   submitEncounterAction,
+  switchControlled,
   type MatchState,
 } from './core/match/state'
 import { Squad } from './core/progression/squad'
@@ -82,6 +83,12 @@ window.addEventListener('keydown', (event) => {
   if (event.key === ' ' || event.key === 'Enter') {
     if (requestActionMenu(state)) event.preventDefault()
   }
+
+  // Take the defender best placed to challenge. Tab would otherwise move focus.
+  if (event.key === 'Tab' || event.key.toLowerCase() === 'q') {
+    switchControlled(state)
+    event.preventDefault()
+  }
 })
 
 // A backgrounded tab stops firing rAF; restart cleanly instead of accumulating time.
@@ -110,6 +117,7 @@ if (import.meta.env.DEV) {
       submitEncounterAction,
       requestActionMenu,
       cancelActionMenu,
+      switchControlled,
     },
   })
 }

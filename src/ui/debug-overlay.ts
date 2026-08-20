@@ -32,6 +32,7 @@ export class DebugOverlay {
       '',
       'WASD / arrows to swim',
       'space to stop and look up',
+      'tab / q to switch player',
       'number keys to choose in an encounter',
       '~ toggle overlay',
     ].join('\n')

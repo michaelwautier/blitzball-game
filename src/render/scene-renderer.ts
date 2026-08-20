@@ -10,7 +10,8 @@ import {
 import { PLAYER_RADIUS } from '../core/match/movement'
 import { statusLabels } from '../core/match/status'
 import { isExhausted } from '../core/match/stats'
-import type { MatchState, Player } from '../core/match/state'
+import { carrierOf, opponentOf, playerById } from '../core/match/queries'
+import { USER_TEAM, type MatchState, type Player } from '../core/match/state'
 import { interpolateToScene } from './projection'
 
 const COLOURS = {
@@ -25,19 +26,33 @@ const COLOURS = {
 } as const
 
 /**
- * How far the camera sits back from the plane of play.
+ * The broadcast camera, all as fractions of the pool so a resized pitch keeps
+ * the same framing.
  *
- * Far enough that the whole sphere fits the frame with room around it: at the
- * default field of view the pool subtends most of the height, and any closer
- * clips the bottom of it.
+ * Low and back, looking across the water rather than down onto it — the angle a
+ * touchline camera takes, which is what puts the far wall of the sphere on the
+ * horizon instead of filling the frame with pitch.
  */
-const CAMERA_DISTANCE = 178
+const CAMERA_HEIGHT = POOL_RADIUS * 0.5
+const CAMERA_BACK = POOL_RADIUS * 1.0
 
-/** How much the camera drifts towards the ball, as a fraction of its offset. */
-const CAMERA_FOLLOW = 0.22
+/** How far the camera sits behind play, along the line to the goal. */
+const CAMERA_TRAIL = POOL_RADIUS * 0.18
+
+/**
+ * How far ahead of the player the camera looks.
+ *
+ * Deliberately slight. Pointing hard at the goal under threat made the whole
+ * scene yaw every time possession changed; as a gentle bias it reads as the
+ * camera favouring the direction of play without anyone noticing it move.
+ */
+const CAMERA_LEAD = POOL_RADIUS * 0.18
+
+/** How much of play's travel across the pool the camera follows. */
+const DEPTH_FOLLOW = 0.35
 
 /** Seconds for the camera to cover most of the distance to where it wants to be. */
-const CAMERA_EASE = 0.9
+const CAMERA_EASE = 0.5
 
 /**
  * The pool in three dimensions.
@@ -59,14 +74,16 @@ export class SceneRenderer {
   private readonly bodies = new Map<string, PlayerBody>()
   private readonly ball: THREE.Mesh
   private readonly cameraTarget = new THREE.Vector3()
-  private readonly cameraGoal = new THREE.Vector3(0, 0, CAMERA_DISTANCE)
+  private readonly cameraGoal = new THREE.Vector3()
+  private readonly lookGoal = new THREE.Vector3()
+  private started = false
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setClearColor(COLOURS.background, 1)
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 1, 800)
-    this.camera.position.set(0, 0, CAMERA_DISTANCE)
+    this.camera = new THREE.PerspectiveCamera(55, 1, 1, 800)
+    this.camera.position.set(0, CAMERA_HEIGHT, CAMERA_BACK)
 
     this.buildLighting()
     this.buildPool()
@@ -95,8 +112,8 @@ export class SceneRenderer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.setSize(clientWidth, clientHeight, false)
     this.camera.aspect = clientWidth / clientHeight
-    // Pull back on a narrow window so the whole pool stays in frame.
-    this.camera.fov = this.camera.aspect < 1.2 ? 56 : 42
+    // Widen on a narrow window so roughly the same amount of pool stays visible.
+    this.camera.fov = this.camera.aspect < 1.2 ? 68 : 55
     this.camera.updateProjectionMatrix()
   }
 
@@ -110,7 +127,7 @@ export class SceneRenderer {
     )
     this.ball.position.set(ball.x, ball.y, ball.z)
 
-    this.followBall(ball, dt)
+    this.followPlayer(state, dt)
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -119,18 +136,50 @@ export class SceneRenderer {
   }
 
   /**
-   * Drift the camera towards the ball rather than tracking it exactly.
+   * Track the player being controlled, from the touchline.
    *
-   * A camera locked to the ball makes the pool itself appear to swing about,
-   * which is disorienting and hides where play actually is. Following a fraction
-   * of the way keeps the sphere steady and still leads the eye.
+   * The camera slides along with play at a fixed height and distance, the way a
+   * broadcast camera pans, rather than orbiting behind whoever has the ball. The
+   * goal under threat — the one defended by whichever side does *not* have
+   * possession — only biases where it sits and what it looks at, by a fraction
+   * of the pool. Turning hard towards it made the entire scene yaw whenever
+   * possession changed, which is the kind of camera movement that makes a game
+   * unpleasant to watch.
+   *
+   * Travel across the pool is damped, so the camera drifts in and out a little
+   * with play instead of matching it and making the horizon heave.
    */
-  private followBall(ball: { x: number; y: number }, dt: number): void {
-    this.cameraGoal.set(ball.x * CAMERA_FOLLOW, ball.y * CAMERA_FOLLOW, CAMERA_DISTANCE)
-    const ease = 1 - Math.exp(-dt / (CAMERA_EASE / 3))
-    this.camera.position.lerp(this.cameraGoal, ease)
+  private followPlayer(state: MatchState, dt: number): void {
+    const focusPlayer = playerById(state, state.controlled) ?? state.players[0]
+    if (!focusPlayer) return
 
-    this.cameraTarget.lerp(new THREE.Vector3(ball.x * 0.35, ball.y * 0.35, 0), ease)
+    const focus = interpolateToScene(focusPlayer, focusPlayer, 1)
+    const towards = Math.sign(threatenedGoalX(state) - focus.x) || 1
+
+    this.cameraGoal.set(
+      focus.x - towards * CAMERA_TRAIL,
+      CAMERA_HEIGHT,
+      focus.z * DEPTH_FOLLOW + CAMERA_BACK,
+    )
+    // Aim a little beyond play, so the pitch sits in the middle of the frame
+    // rather than riding high with empty water in the foreground.
+    this.lookGoal.set(
+      focus.x + towards * CAMERA_LEAD,
+      0,
+      focus.z * DEPTH_FOLLOW - POOL_RADIUS * 0.18,
+    )
+
+    if (!this.started) {
+      // Do not sweep in from wherever the camera was constructed.
+      this.started = true
+      this.camera.position.copy(this.cameraGoal)
+      this.cameraTarget.copy(this.lookGoal)
+    } else {
+      const ease = 1 - Math.exp(-dt / CAMERA_EASE)
+      this.camera.position.lerp(this.cameraGoal, ease)
+      this.cameraTarget.lerp(this.lookGoal, ease)
+    }
+
     this.camera.lookAt(this.cameraTarget)
   }
 
@@ -189,7 +238,7 @@ export class SceneRenderer {
     this.scene.add(ring(CENTRE_CIRCLE_RADIUS, 0.22, COLOURS.markings, 0.35))
 
     const halfway = new THREE.Mesh(
-      new THREE.BoxGeometry(0.25, POOL_RADIUS * 2, 0.05),
+      new THREE.BoxGeometry(0.3, 0.05, POOL_RADIUS * 2),
       new THREE.MeshBasicMaterial({ color: COLOURS.markings, transparent: true, opacity: 0.28 }),
     )
     this.scene.add(halfway)
@@ -209,6 +258,7 @@ export class SceneRenderer {
       }),
     )
     hoop.position.set(x, 0, 0)
+    hoop.rotation.y = Math.PI / 2
     this.scene.add(hoop)
 
     const net = new THREE.Mesh(
@@ -223,7 +273,7 @@ export class SceneRenderer {
     )
     net.position.set(x, 0, 0)
     // Open end towards the pitch, so the mouth faces play.
-    net.rotation.z = side === 'left' ? Math.PI / 2 : -Math.PI / 2
+    net.rotation.z = side === 'left' ? -Math.PI / 2 : Math.PI / 2
     this.scene.add(net)
   }
 
@@ -269,9 +319,10 @@ export class SceneRenderer {
     group.add(mesh)
 
     const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(PLAYER_RADIUS + 1.1, 0.22, 8, 32),
+      new THREE.TorusGeometry(PLAYER_RADIUS + 1.2, 0.28, 8, 32),
       new THREE.MeshBasicMaterial({ color: COLOURS.control }),
     )
+    ring.rotation.x = -Math.PI / 2
     ring.visible = false
     group.add(ring)
 
@@ -280,17 +331,17 @@ export class SceneRenderer {
       new THREE.ConeGeometry(0.9, 1.8, 12),
       new THREE.MeshBasicMaterial({ color: COLOURS.ball }),
     )
-    marker.position.set(0, PLAYER_RADIUS + 2.2, 0)
+    marker.position.set(0, PLAYER_RADIUS + 5.2, 0)
     marker.rotation.z = Math.PI
     marker.visible = false
     group.add(marker)
 
     const name = makeLabel(player.def.name, '#e8f4ff')
-    name.position.set(0, -PLAYER_RADIUS - 2.4, 0)
+    name.position.set(0, PLAYER_RADIUS + 2.6, 0)
     group.add(name)
 
     const status = makeLabel('', '#c98bff')
-    status.position.set(0, PLAYER_RADIUS + 4.4, 0)
+    status.position.set(0, PLAYER_RADIUS + 6.4, 0)
     status.visible = false
     group.add(status)
 
@@ -312,10 +363,13 @@ interface PlayerBody {
 
 /** A flat ring lying in the plane of play. */
 function ring(radius: number, thickness: number, colour: number, opacity: number): THREE.Mesh {
-  return new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     new THREE.TorusGeometry(radius, thickness, 8, 96),
     new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity }),
   )
+  // A torus is built standing up; lay it down onto the plane of play.
+  mesh.rotation.x = -Math.PI / 2
+  return mesh
 }
 
 /**
@@ -355,4 +409,15 @@ function paintLabel(sprite: THREE.Sprite, text: string, colour: string): void {
   material.map?.dispose()
   material.map = texture
   material.needsUpdate = true
+}
+
+/**
+ * The goal that is under threat: the one defended by whichever side does not
+ * have the ball. With the ball loose, the user's own attacking end stands in,
+ * so the view does not swing about while it is up for grabs.
+ */
+function threatenedGoalX(state: MatchState): number {
+  const carrier = carrierOf(state)
+  const defending = carrier ? opponentOf(carrier.team) : opponentOf(USER_TEAM)
+  return goalLineX(state.teams[defending].defending)
 }

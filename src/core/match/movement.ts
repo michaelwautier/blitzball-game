@@ -1,4 +1,13 @@
-import { clampToPool, type Vec2 } from '../pitch'
+import { POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
+
+/**
+ * The pool size the speed and decay constants were tuned against.
+ *
+ * Distances scale with the pool so that enlarging it gives players room without
+ * silently retuning the game: a throw across the same fraction of the pool costs
+ * the same, and crossing it still takes the same few seconds.
+ */
+export const REFERENCE_POOL_RADIUS = 50
 
 export const PLAYER_RADIUS = 2.2
 
@@ -24,7 +33,7 @@ export interface Movable extends Vec2 {
  * — roughly four seconds to cross the pool.
  */
 export function maxSpeed(sp: number): number {
-  return 4 + sp * 0.14
+  return (4 + sp * 0.14) * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
 }
 
 /** Carrying the ball costs a little pace. */
