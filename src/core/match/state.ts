@@ -7,6 +7,9 @@ import { desiredPosition } from '../ai/positioning'
 import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
 import {
   AI_THINK_SECONDS,
+  ENGAGE_RADIUS,
+  MAX_ENGAGED,
+  chargeCommittedDefenders,
   engagingDefenders,
   openDistribution,
   openEncounter,
@@ -26,7 +29,7 @@ import {
 import { collectLooseBall, giveBallTo } from './possession'
 import { tickStatuses } from './status'
 import { CARRY_DRAIN_PER_SECOND, HP_REGEN_PER_SECOND } from '../encounter/formulas'
-import { carrierOf, opponentOf, playerById, speedOf } from './queries'
+import { carrierOf, distanceBetween, opponentOf, playerById, speedOf } from './queries'
 import {
   NO_INPUT,
   USER_TEAM,
@@ -128,6 +131,7 @@ function buildSide(team: TeamState, careers: CareerLookup): Player[] {
       hp: stats.hp,
       statuses: [],
       recovery: 0,
+      engageCooldown: 0,
       lunge: null,
     }
   })
@@ -157,6 +161,7 @@ export function resetForKickoff(state: MatchState, possession: TeamId | null = n
     player.vx = 0
     player.vy = 0
     player.recovery = 0
+    player.engageCooldown = 0
     player.lunge = null
   }
 
@@ -338,6 +343,7 @@ function updateCondition(state: MatchState, dt: number): void {
   for (const player of state.players) {
     tickStatuses(player, dt)
     player.recovery = Math.max(0, player.recovery - dt)
+    player.engageCooldown = Math.max(0, player.engageCooldown - dt)
 
     // Carrying costs; everyone else is catching their breath.
     if (state.ball.carrier === player.id) {
@@ -436,6 +442,44 @@ function maybeOpenEncounter(state: MatchState): void {
   // One line per defender, as FFX calls them out. Nearest first, matching both
   // the order they are challenged in and the order the menu lists them.
   announce(state, defenders.map((d) => `${d.def.name} on defense!`).join('\n'))
+}
+
+/**
+ * Challenge the player on the ball, on purpose.
+ *
+ * The defending counterpart of stopping to look up. A carrier can always call a
+ * halt and think; before this, a defender could only wait for one to happen to
+ * them — which meant being glued to an opponent for seconds at a time with no
+ * move available, while the same situation on the ball felt entirely responsive.
+ *
+ * Bypasses the *global* grace for exactly the reason `requestActionMenu`
+ * bypasses it: that grace paces what the game does by itself, and this is a
+ * person deciding to act. It does not bypass this defender's own cooldown, which
+ * is what stops the key being mashed, nor being *beaten* — someone still turning
+ * round after a failed tackle has nothing to challenge with — nor being out of
+ * reach.
+ */
+export function requestChallenge(state: MatchState): boolean {
+  if (state.phase.kind !== 'play') return false
+
+  const carrier = carrierOf(state)
+  if (!carrier || carrier.team === USER_TEAM) return false
+
+  const challenger = playerById(state, state.controlled)
+  if (!challenger || challenger.team !== USER_TEAM) return false
+  if (challenger.slot === 'GK' || challenger.recovery > 0) return false
+  // The one cooldown a deliberate challenge respects, so it cannot be mashed.
+  if (challenger.engageCooldown > 0) return false
+  if (distanceBetween(challenger, carrier) > ENGAGE_RADIUS) return false
+
+  // Whoever else is already on them comes along, so a deliberate challenge and
+  // one that happens by itself produce the same encounter.
+  const others = engagingDefenders(state, carrier).filter((p) => p.id !== challenger.id)
+  const defenders = [challenger, ...others].slice(0, MAX_ENGAGED)
+
+  state.phase = { kind: 'encounter', encounter: openEncounter(state, carrier, defenders) }
+  announce(state, defenders.map((d) => `${d.def.name} on defense!`).join('\n'))
+  return true
 }
 
 /**
@@ -547,6 +591,10 @@ function applyEncounterAction(
     encounter.thinkTimer = AI_THINK_SECONDS
     return
   }
+
+  // The encounter is over however it went, so everyone still in it has
+  // committed and spent their moment.
+  chargeCommittedDefenders(state, encounter)
 
   // Pass and shoot move to a flight themselves; anything else resumes open play.
   if (state.phase.kind === 'encounter') state.phase = { kind: 'play' }
