@@ -63,9 +63,10 @@ Match state machine: `Kickoff → FreePlay ⇄ Encounter → (Resolution anim) �
 
 ## Phases
 
-### Phase 0 — Scaffold (small)
-Vite + TS project, fixed-timestep game loop, Canvas pool rendering (circular pool,
-center line, two goals), debug overlay. Seedable RNG utility.
+### Phase 0 — Scaffold ✅ (PR #1)
+Vite + TS project, fixed-timestep game loop with interpolated rendering, Canvas pool
+rendering (circular pool, halfway line, two goals), debug overlay, seedable RNG, and CI
+running typecheck/tests/build on every PR.
 
 ### Phase 1 — Playable single match (the real PoC milestone)
 - Data: Aurochs + Goers rosters with stats.
@@ -93,6 +94,32 @@ post-match summary screen showing EXP gains and stat changes.
 Fixture list for all 6 teams; other fixtures auto-simmed headlessly with the same engine;
 standings table; free-agent pool (Brother, Ropp, Jumal, Wedge…) with salaries/contracts;
 simple prize money economy; save/load via `localStorage`.
+
+## Upgrading to 2.5D / 3D later
+
+2D top-down is the PoC's *renderer*, not its architecture. Nothing about the design locks
+it in, and the split is deliberate: `core/` never imports from `render/`, and it works in
+abstract world units rather than pixels. A Three.js renderer would consume the same
+`MatchState` and draw it differently — the match engine would not change at all.
+
+Two levels of upgrade, with very different costs:
+
+- **Presentational 3D (cheap, high payoff).** Keep the simulation on its 2D plane and
+  render that plane inside a translucent sphere with a proper camera, player models, and
+  water. Play is still planar, but it *looks* like FFX. This is a renderer swap plus camera
+  and asset work; the sim is untouched. Best value, and the recommended path.
+- **True volumetric 3D (expensive).** Depth becomes real: players swim above and below each
+  other, and height affects passes, shots, and blocks. This means `Vec2` → `Vec3` in
+  `core/pitch.ts` and a z-term in the distance calculations that feed pass/shot decay and
+  encounter proximity. Contained — the encounter resolution itself is stat-based, not
+  physics-based, so the formulas survive — but it touches AI positioning and every
+  formation, and it makes the game meaningfully harder to read and control.
+
+Practical sequencing: finish Phases 1–2 in 2D where the gameplay is easy to debug, then do
+the presentational 3D swap once the match actually plays well. Deciding between the two
+levels only matters at that point; keeping distance calculations funnelled through helpers
+in `core/pitch.ts` (rather than inlining `Math.hypot` at call sites) is the one discipline
+that keeps the volumetric option cheap.
 
 ## Risks & notes
 
