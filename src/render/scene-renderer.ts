@@ -52,23 +52,6 @@ const CAMERA_LEAD = POOL_RADIUS * 0.1
 /** Seconds for the camera to cover most of the distance to where it wants to be. */
 const CAMERA_EASE = 0.5
 
-/**
- * How quickly the camera answers a menu selection, rather than play.
- *
- * Looking at a pass target is a response to a keypress, and at the ordinary ease
- * it took a second and a half to arrive — so arrowing down a list of four
- * teammates left the camera permanently sliding and never settling on any of
- * them. That reads as lag, though it costs nothing: a preview frame measures
- * *cheaper* than an ordinary one, at 0.045ms against 0.074ms. It was slow, not
- * heavy.
- *
- * Used in both directions, so returning to the player on the ball is just as
- * prompt as leaving them.
- */
-const PREVIEW_EASE = 0.11
-
-/** Close enough to its goal to call the camera arrived, in world units. */
-const ARRIVED = 1.5
 
 /**
  * How far the camera may sit from the middle of the pool.
@@ -129,10 +112,6 @@ export class SceneRenderer {
   private readonly cameraGoal = new THREE.Vector3()
   private readonly lookGoal = new THREE.Vector3()
   private started = false
-  /** Who the camera was previewing last frame, to notice the selection changing. */
-  private lastFocusId: string | null = null
-  /** Answering a selection, until the camera has actually got there. */
-  private prompt = false
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -240,20 +219,14 @@ export class SceneRenderer {
       this.camera.position.copy(this.cameraGoal)
       this.cameraTarget.copy(this.lookGoal)
     } else {
-      // A menu selection is answered promptly, and stays prompt until the camera
-      // has arrived — otherwise leaving a preview is quick and coming back from
-      // one crawls, which is the same lag in the other direction.
-      if (focusId !== this.lastFocusId) this.prompt = true
-      if (this.prompt && this.camera.position.distanceTo(this.cameraGoal) < ARRIVED) {
-        this.prompt = false
-      }
-
-      const ease = 1 - Math.exp(-dt / (this.prompt ? PREVIEW_EASE : CAMERA_EASE))
+      // One ease for everything, including menu selections. A faster one was
+      // tried for those — a preview took a second and a half to arrive, which
+      // looked like lag — but the sweep across the pool turns out to be worth
+      // more than the promptness, so it stays.
+      const ease = 1 - Math.exp(-dt / CAMERA_EASE)
       this.camera.position.lerp(this.cameraGoal, ease)
       this.cameraTarget.lerp(this.lookGoal, ease)
     }
-
-    this.lastFocusId = focusId
 
     this.camera.lookAt(this.cameraTarget)
   }

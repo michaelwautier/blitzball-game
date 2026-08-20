@@ -229,10 +229,11 @@ against the ladder alone.
     controls mid-swim. Sameness of behaviour beats any framing.
     The camera also follows **the ball** while it is in the air, rather than the player who let
     go of it, and **a teammate being considered for a pass** while that choice is open.
-    Answering a menu selection uses a much shorter ease, in both directions: at the ordinary
-    one the camera took a second and a half to arrive, so arrowing down a list left it
-    permanently sliding. That read as the preview being expensive; it measured *cheaper* than
-    an ordinary frame, at 0.045ms against 0.074ms. It was slow, not heavy.
+    The preview felt expensive and is not: a preview frame measures *cheaper* than an ordinary
+    one, at 0.045ms against 0.074ms. What it is, is slow — a second and a half to arrive, so
+    arrowing down a list leaves the camera sliding. A quicker ease for menu selections was
+    tried and rejected on taste: the long sweep across the pool is worth more than the
+    promptness. Kept as a single ease for everything.
 10. **Team strategies.** The first genuinely tactical decision the user gets. Each side plays a
     defensive shape with real trade-offs — pressing commits everyone to the carrier and leaves
     the passing lanes open; zone holds shape and concedes the carrier room; man-marking sits
