@@ -1,5 +1,6 @@
 import { BALL_RADIUS } from '../pitch'
 import { PLAYER_RADIUS } from './movement'
+import { effectiveStat } from './stats'
 import type { MatchState, Player } from './types'
 
 /** How close a player must be to collect a loose ball. */
@@ -28,7 +29,7 @@ export function giveBallTo(state: MatchState, player: Player): void {
   state.ball.carrier = player.id
   state.ball.vx = 0
   state.ball.vy = 0
-  state.endurance = player.def.stats.en
+  state.endurance = effectiveStat(player, 'en')
   state.pickupCooldown = 0
   state.engageCooldown = Math.max(state.engageCooldown, POSSESSION_GRACE)
 }

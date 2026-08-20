@@ -160,7 +160,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:tidus', 1)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka' })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null })
 
     expect(result.success).toBe(true)
     expect(state.ball.carrier).toBeNull()
@@ -176,7 +176,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:tidus', 1)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson' })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(carrier.id)
@@ -188,7 +188,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:wakka', 1)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    resolveEncounter(state, encounter, { kind: 'shoot' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null })
 
     expect(state.phase.kind).toBe('flight')
     if (state.phase.kind === 'flight') {

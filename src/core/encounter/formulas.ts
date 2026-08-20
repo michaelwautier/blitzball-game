@@ -82,3 +82,25 @@ export function contestReduction(bl: number, rng: Rng): number {
 export function keeperSaves(power: number, ca: number, rng: Rng): boolean {
   return rollStat(ca, rng) >= power
 }
+
+/**
+ * HP spent by the plain version of each action, before any technique cost.
+ *
+ * Sized against typical HP pools of 160–250 so a busy match genuinely tires a
+ * player out — an attacker who takes every shot will be running on empty by the
+ * second half, which is what makes squad depth mean anything.
+ */
+export const ACTION_HP_COST = {
+  breakthrough: 8,
+  pass: 5,
+  shoot: 12,
+} as const
+
+/**
+ * HP recovered per second by a player who is not carrying the ball.
+ *
+ * Deliberately below the rate at which a busy player spends it. At 1.2 a match's
+ * worth of regeneration exceeded any player's maximum HP, so stamina was never a
+ * constraint and the best technique was simply used every single time.
+ */
+export const HP_REGEN_PER_SECOND = 0.6

@@ -4,33 +4,51 @@ import { attackDirection } from './formation'
 import { PLAYER_RADIUS } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
 import { giveBallTo, releaseBall } from './possession'
+import { applyStatus } from './status'
+import { effectiveStat } from './stats'
+import type { Technique } from '../../data/techniques'
 import type { BallFlight, MatchState, Player } from './types'
 
 /** How fast a pass or shot travels, in world units per second. */
 export const FLIGHT_SPEED = 46
 
 /** Launch a pass towards a teammate. */
-export function startPass(state: MatchState, passer: Player, receiver: Player): BallFlight {
+export function startPass(
+  state: MatchState,
+  passer: Player,
+  receiver: Player,
+  technique: Technique | null = null,
+): BallFlight {
+  const base = passPower(effectiveStat(passer, 'pa'), distanceBetween(passer, receiver), state.rng)
   return {
     kind: 'pass',
     fromTeam: passer.team,
     targetId: receiver.id,
     target: { x: receiver.x, y: receiver.y },
-    power: passPower(passer.def.stats.pa, distanceBetween(passer, receiver), state.rng),
+    power: base + (technique?.power ?? 0),
     contested: [],
+    technique,
+    blockersIgnored: technique?.ignoresBlockers ?? 0,
   }
 }
 
 /** Launch a shot at the goal this player is attacking. */
-export function startShot(state: MatchState, shooter: Player): BallFlight {
+export function startShot(
+  state: MatchState,
+  shooter: Player,
+  technique: Technique | null = null,
+): BallFlight {
   const target = aimPoint(state, shooter)
+  const base = shotPower(effectiveStat(shooter, 'sh'), distanceBetween(shooter, target), state.rng)
   return {
     kind: 'shot',
     fromTeam: shooter.team,
     targetId: null,
     target,
-    power: shotPower(shooter.def.stats.sh, distanceBetween(shooter, target), state.rng),
+    power: base + (technique?.power ?? 0),
     contested: [],
+    technique,
+    blockersIgnored: technique?.ignoresBlockers ?? 0,
   }
 }
 
@@ -101,7 +119,20 @@ function contestInFlight(state: MatchState, flight: BallFlight): boolean {
     if (distanceBetween(player, state.ball) > CONTEST_RADIUS) continue
 
     flight.contested.push(player.id)
-    flight.power -= contestReduction(player.def.stats.bl, state.rng)
+
+    // A technique's inflicted condition lands on anyone who tries to cut it out,
+    // whether or not their contest actually gets through.
+    if (flight.technique?.inflicts && flight.technique.kind === 'pass') {
+      applyStatus(player, flight.technique.inflicts)
+    }
+
+    if (flight.blockersIgnored > 0) {
+      // Waved through by the technique: they reach it but cannot slow it down.
+      flight.blockersIgnored -= 1
+      continue
+    }
+
+    flight.power -= contestReduction(effectiveStat(player, 'bl'), state.rng)
 
     if (flight.power <= 0) {
       giveBallTo(state, player)
@@ -132,7 +163,13 @@ function resolvePassArrival(state: MatchState, flight: BallFlight): void {
 function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   const keeper = keeperFor(state, opponentOf(flight.fromTeam))
 
-  if (keeper && keeperSaves(flight.power, keeper.def.stats.ca, state.rng)) {
+  // Shot techniques hit the keeper on arrival, before the catch is attempted, so
+  // a Nap Shot is genuinely a way through a keeper you could not otherwise beat.
+  if (keeper && flight.technique?.inflicts && flight.technique.kind === 'shoot') {
+    applyStatus(keeper, flight.technique.inflicts)
+  }
+
+  if (keeper && keeperSaves(flight.power, effectiveStat(keeper, 'ca'), state.rng)) {
     giveBallTo(state, keeper)
     clearAreaAroundKeeper(state, keeper)
     state.engageCooldown = KEEPER_CLEARANCE_GRACE
