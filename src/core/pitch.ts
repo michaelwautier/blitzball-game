@@ -15,7 +15,7 @@
  * that is what turns a bigger pool into more space rather than the same game
  * drawn larger.
  */
-export const POOL_RADIUS = 80
+export const POOL_RADIUS = 110
 
 /** Distance from the origin to each goal line. Sits just inside the boundary. */
 export const GOAL_X = POOL_RADIUS * 0.92

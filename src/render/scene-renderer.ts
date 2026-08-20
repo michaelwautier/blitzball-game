@@ -33,11 +33,11 @@ const COLOURS = {
  * touchline camera takes, which is what puts the far wall of the sphere on the
  * horizon instead of filling the frame with pitch.
  */
-const CAMERA_HEIGHT = POOL_RADIUS * 0.5
-const CAMERA_BACK = POOL_RADIUS * 1.0
+const CAMERA_HEIGHT = POOL_RADIUS * 0.3
+const CAMERA_BACK = POOL_RADIUS * 0.58
 
 /** How far the camera sits behind play, along the line to the goal. */
-const CAMERA_TRAIL = POOL_RADIUS * 0.18
+const CAMERA_TRAIL = POOL_RADIUS * 0.1
 
 /**
  * How far ahead of the player the camera looks.
@@ -46,7 +46,7 @@ const CAMERA_TRAIL = POOL_RADIUS * 0.18
  * scene yaw every time possession changed; as a gentle bias it reads as the
  * camera favouring the direction of play without anyone noticing it move.
  */
-const CAMERA_LEAD = POOL_RADIUS * 0.18
+const CAMERA_LEAD = POOL_RADIUS * 0.1
 
 /** How much of play's travel across the pool the camera follows. */
 const DEPTH_FOLLOW = 0.35
@@ -166,7 +166,7 @@ export class SceneRenderer {
     this.lookGoal.set(
       focus.x + towards * CAMERA_LEAD,
       0,
-      focus.z * DEPTH_FOLLOW - POOL_RADIUS * 0.18,
+      focus.z * DEPTH_FOLLOW - POOL_RADIUS * 0.1,
     )
 
     if (!this.started) {
