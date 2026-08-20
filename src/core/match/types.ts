@@ -189,15 +189,30 @@ export interface DefenceChoice {
 
 /** A pass or shot travelling, still liable to be contested. */
 export interface BallFlight {
-  kind: 'pass' | 'shot'
+  /**
+   * `pass` and `shot` are throws, and resolve when they arrive. `spilled` is the
+   * ball travelling on to whoever collects a throw that arrived with nothing
+   * left — there is nothing further to contest, only distance to cover.
+   */
+  kind: 'pass' | 'shot' | 'spilled'
   fromTeam: TeamId
   /** Who launched it, so the credit for it can find them later. */
   passerId: string
   /** Intended receiver for a pass; null for a shot. */
   targetId: string | null
   target: Vec2
-  /** Remaining power. Hits zero and the ball drops short. */
+  /**
+   * Power the throw left the hand with.
+   *
+   * Spent on arrival rather than drained in the air: a throw always reaches
+   * where it was aimed, and distance is settled when it gets there. Draining it
+   * mid-flight meant a throw died wherever it ran out and was collected by
+   * whoever happened to be standing at that spot — which read as an
+   * interception by a defender who, by the rules, cannot intercept.
+   */
   power: number
+  /** How far it has flown, for the decay charged on arrival. */
+  travelled: number
   /** Technique used to launch it, whose effects apply on arrival. */
   technique: Technique | null
   /** Contests still to be waved through, from the technique's `ignoresBlockers`. */
