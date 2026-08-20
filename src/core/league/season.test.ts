@@ -19,6 +19,21 @@ const IDS = TEAMS.map((team) => team.id)
 const USER = 'aurochs'
 const newSeason = (seed = 'season') => createSeason(IDS, USER, seed)
 
+/**
+ * A three-team league, for the tests that have to play a season out.
+ *
+ * Simulating a match is the real engine at full fidelity, so a six-team season
+ * is forty of them and takes long enough to time out on a slower machine. The
+ * structure being checked — every side playing the same number of matches,
+ * points adding up, the season ending — holds at any size, and the six-team
+ * schedule itself is covered in `fixtures.test.ts`.
+ */
+const SMALL = ['aurochs', 'goers', 'beasts']
+const smallSeason = (seed: string) => createSeason(SMALL, USER, seed)
+
+/** Long enough for a real simulation on a slow CI runner. */
+const SIMULATED = 120_000
+
 describe('starting a season', () => {
   it('schedules every side against every other, twice', () => {
     const season = newSeason()
@@ -93,20 +108,20 @@ describe('the rest of the round', () => {
     for (const fixture of season.fixtures.filter((f) => f.round === 1)) {
       expect(isPlayed(season, fixture)).toBe(!involves(fixture, USER))
     }
-  })
+  }, SIMULATED)
 
   it('leaves the user to play their own', () => {
     const season = newSeason()
     simulateRound(season, 1)
     expect(nextUserFixture(season)!.round).toBe(1)
-  })
+  }, SIMULATED)
 
   it('does not replay a round it has already resolved', () => {
     const season = newSeason()
     expect(simulateRound(season, 1)).toBe(2)
     expect(simulateRound(season, 1)).toBe(0)
     expect(season.results).toHaveLength(2)
-  })
+  }, SIMULATED)
 
   it('holds the round until the user has played theirs', () => {
     const season = newSeason()
@@ -115,22 +130,22 @@ describe('the rest of the round', () => {
 
     recordResult(season, nextUserFixture(season)!, 1, 1)
     expect(currentRound(season)).toBe(2)
-  })
+  }, SIMULATED)
 
   it('produces scorelines from the real engine, not from thin air', () => {
-    const season = newSeason()
+    const season = smallSeason('engine')
     simulateRestOfSeason(season)
-    // Twenty-four fixtures without the user's ten. Goals are scored in them.
+    // Six fixtures, four of them without the user. Goals are scored in them.
+    expect(season.results).toHaveLength(2)
     const goals = season.results.reduce((sum, r) => sum + r.home + r.away, 0)
-    expect(season.results).toHaveLength(20)
     expect(goals).toBeGreaterThan(0)
-  })
+  }, SIMULATED)
 })
 
 describe('finishing a season', () => {
   /** Play the whole thing out, the user's fixtures included. */
   const playOut = (seed: string) => {
-    const season = createSeason(IDS, USER, seed)
+    const season = smallSeason(seed)
     for (let round = 1; round <= totalRounds(season); round++) {
       simulateRound(season, round)
       const fixture = nextUserFixture(season)
@@ -143,14 +158,14 @@ describe('finishing a season', () => {
     const season = playOut('finish')
     expect(isSeasonOver(season)).toBe(true)
     expect(currentRound(season)).toBe(totalRounds(season) + 1)
-  })
+  }, SIMULATED)
 
   it('has every side playing the same number of matches', () => {
     const table = seasonTable(playOut('even'))
     const played = table.map((row) => row.played)
     expect(new Set(played).size, `uneven: ${played.join(', ')}`).toBe(1)
-    expect(played[0]).toBe((IDS.length - 1) * 2)
-  })
+    expect(played[0]).toBe((SMALL.length - 1) * 2)
+  }, SIMULATED)
 
   it('awards points that add up to what was played', () => {
     const season = playOut('points')
@@ -159,7 +174,7 @@ describe('finishing a season', () => {
     // Three per fixture, less one for each draw, since a draw pays two in total.
     const draws = season.results.filter((r) => r.home === r.away).length
     expect(awarded).toBe(season.results.length * 3 - draws)
-  })
+  }, SIMULATED)
 })
 
 describe('replaying a season', () => {
@@ -190,7 +205,7 @@ describe('replaying a season', () => {
       expect([other!.home, other!.away]).toEqual([result.home, result.away])
     }
     expect(forwards.results.length).toBe(4)
-  })
+  }, SIMULATED)
 
   it('gives different seasons different results', () => {
     const line = (seed: string) => {
@@ -200,7 +215,7 @@ describe('replaying a season', () => {
       return season.results.map((r) => `${r.home}-${r.away}`).join(',')
     }
     expect(line('seed-one')).not.toBe(line('seed-two'))
-  })
+  }, SIMULATED)
 
   it('seeds each fixture distinctly', () => {
     const season = newSeason()
