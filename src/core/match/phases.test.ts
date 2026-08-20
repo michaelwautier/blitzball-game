@@ -124,7 +124,8 @@ describe('ball in flight', () => {
     state.ball.x = passer.x
     state.ball.y = passer.y
     state.ball.carrier = null
-    state.phase = { kind: 'flight', flight: startPass(state, passer, receiver) }
+    // Plenty of power, so these test the flight rather than the contest.
+    state.phase = { kind: 'flight', flight: startPass(passer, receiver, 40) }
 
     for (let i = 0; i < 120 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
@@ -132,8 +133,8 @@ describe('ball in flight', () => {
     expect(state.ball.carrier).toBe(receiver.id)
   })
 
-  it('lets a defender in the way intercept it', () => {
-    const state = newMatch('intercept')
+  it('ignores a defender who merely happens to be in the way', () => {
+    const state = newMatch('bystander')
     const passer = find(state, 'home:tidus')
     const receiver = find(state, 'home:wakka')
     passer.x = -20
@@ -141,22 +142,48 @@ describe('ball in flight', () => {
     receiver.x = 20
     receiver.y = 0
 
-    // A wall of defenders across the passing lane, each taking a bite.
-    const blockers = state.players.filter((p) => p.team === 'away' && p.slot !== 'GK')
-    blockers.forEach((blocker, index) => {
-      blocker.x = -12 + index * 5
-      blocker.y = 0
-    })
+    // A wall of opponents straight down the passing lane. Under the old rule
+    // each took a bite out of the ball; now only defenders who actually engaged
+    // the carrier get a say, and none of these did.
+    state.players
+      .filter((p) => p.team === 'away' && p.slot !== 'GK')
+      .forEach((blocker, index) => {
+        blocker.x = -12 + index * 5
+        blocker.y = 0
+      })
 
     state.ball.x = passer.x
     state.ball.y = passer.y
     state.ball.carrier = null
-    state.phase = { kind: 'flight', flight: startPass(state, passer, receiver) }
+    state.phase = { kind: 'flight', flight: startPass(passer, receiver, 40) }
 
     for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
+    expect(state.ball.carrier).toBe(receiver.id)
+  })
+
+  it('gives the ball away when a throw runs out of range', () => {
+    const state = newMatch('overhit')
+    const passer = find(state, 'home:tidus')
+    const receiver = find(state, 'home:wakka')
+    passer.x = -40
+    passer.y = 0
+    receiver.x = 40
+    receiver.y = 0
+
+    state.ball.x = passer.x
+    state.ball.y = passer.y
+    state.ball.carrier = null
+    // Barely any power for a throw right across the pool.
+    state.phase = { kind: 'flight', flight: startPass(passer, receiver, 1) }
+
+    for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
+
+    expect(state.phase.kind).toBe('play')
+    // Not a loose ball: the opposition collects it.
     expect(state.ball.carrier).not.toBe(receiver.id)
-    expect(state.phase.kind).not.toBe('flight')
+    const holder = state.players.find((p) => p.id === state.ball.carrier)
+    expect(holder?.team).toBe('away')
   })
 
   it('scores when a shot beats the keeper', () => {
@@ -175,7 +202,7 @@ describe('ball in flight', () => {
     state.ball.carrier = null
     state.ball.x = shooter.x
     state.ball.y = shooter.y
-    state.phase = { kind: 'flight', flight: startShot(state, shooter) }
+    state.phase = { kind: 'flight', flight: startShot(state, shooter, 40) }
 
     for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
@@ -219,7 +246,7 @@ describe('ball in flight', () => {
     state.ball.carrier = null
     state.ball.x = shooter.x
     state.ball.y = shooter.y
-    state.phase = { kind: 'flight', flight: startShot(state, shooter) }
+    state.phase = { kind: 'flight', flight: startShot(state, shooter, 40) }
 
     for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
@@ -243,7 +270,7 @@ describe('encounter input', () => {
       encounter: {
         kind: 'contested',
         carrierId: carrier.id,
-        defenders: [{ id: 'home:letty', attack: 9 }],
+        defenders: [{ id: 'home:letty', attack: 9, block: 5 }],
         endurance: 10,
         thinkTimer: 5,
       },
@@ -260,7 +287,7 @@ describe('encounter input', () => {
       encounter: {
         kind: 'contested',
         carrierId: carrier.id,
-        defenders: [{ id: 'away:doram', attack: 9 }],
+        defenders: [{ id: 'away:doram', attack: 9, block: 5 }],
         endurance: 100,
         thinkTimer: 0,
       },

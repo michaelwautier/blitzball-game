@@ -1,34 +1,38 @@
 import { GOAL_HALF_HEIGHT, clampToPool, goalLineX, type Vec2 } from '../pitch'
-import { CONTEST_RADIUS, contestReduction, keeperSaves, passPower, shotPower } from '../encounter/formulas'
+import { PASS_DECAY_PER_UNIT, SHOT_DECAY_PER_UNIT, rollStat } from '../encounter/formulas'
 import { attackDirection } from './formation'
 import { PLAYER_RADIUS, recordPrevious } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
-import { giveBallTo, releaseBall } from './possession'
+import { giveBallTo } from './possession'
 import { awardExp } from './exp'
 import { applyStatus } from './status'
 import { effectiveStat } from './stats'
 import type { Technique } from '../../data/techniques'
-import type { BallFlight, MatchState, Player } from './types'
+import type { BallFlight, MatchState, Player, TeamId } from './types'
 
 /** How fast a pass or shot travels, in world units per second. */
 export const FLIGHT_SPEED = 46
 
-/** Launch a pass towards a teammate. */
+/**
+ * Launch a pass towards a teammate.
+ *
+ * Whatever the defenders left of the passer's PA is what sets off; the throw
+ * then bleeds power over the distance it has to cover, which is what FFX means
+ * by PA being a passing *range* rather than a passing strength.
+ */
 export function startPass(
-  state: MatchState,
   passer: Player,
   receiver: Player,
+  power: number,
   technique: Technique | null = null,
 ): BallFlight {
-  const base = passPower(effectiveStat(passer, 'pa'), distanceBetween(passer, receiver), state.rng)
   return {
     kind: 'pass',
     fromTeam: passer.team,
     passerId: passer.id,
     targetId: receiver.id,
     target: { x: receiver.x, y: receiver.y },
-    power: base + (technique?.power ?? 0),
-    contested: [],
+    power,
     technique,
     blockersIgnored: technique?.ignoresBlockers ?? 0,
   }
@@ -38,18 +42,16 @@ export function startPass(
 export function startShot(
   state: MatchState,
   shooter: Player,
+  power: number,
   technique: Technique | null = null,
 ): BallFlight {
-  const target = aimPoint(state, shooter)
-  const base = shotPower(effectiveStat(shooter, 'sh'), distanceBetween(shooter, target), state.rng)
   return {
     kind: 'shot',
     fromTeam: shooter.team,
     passerId: shooter.id,
     targetId: null,
-    target,
-    power: base + (technique?.power ?? 0),
-    contested: [],
+    target: aimPoint(state, shooter),
+    power,
     technique,
     blockersIgnored: technique?.ignoresBlockers ?? 0,
   }
@@ -69,10 +71,12 @@ export function aimPoint(state: MatchState, shooter: Player): Vec2 {
 }
 
 /**
- * Advance a ball in flight, letting defenders take bites out of it on the way.
+ * Advance a ball in flight.
  *
- * Returns once the ball has been dealt with; the caller is responsible for
- * nothing beyond calling this each tick while the phase is `flight`.
+ * The contest is over by the time anything is in the air: only the defenders who
+ * actually engaged the carrier get to interfere, and they did so at the
+ * encounter. What remains is distance — the throw bleeds power as it travels,
+ * and one that runs out before arriving is beyond the passer's range.
  */
 export function stepFlight(state: MatchState, flight: BallFlight, dt: number): void {
   const { ball } = state
@@ -89,109 +93,124 @@ export function stepFlight(state: MatchState, flight: BallFlight, dt: number): v
   const dx = flight.target.x - ball.x
   const dy = flight.target.y - ball.y
   const remaining = Math.hypot(dx, dy)
-  const travel = FLIGHT_SPEED * dt
+  const travel = Math.min(FLIGHT_SPEED * dt, remaining)
 
-  if (remaining > travel && remaining > 0) {
+  if (remaining > 0) {
     ball.x += (dx / remaining) * travel
     ball.y += (dy / remaining) * travel
     ball.vx = (dx / remaining) * FLIGHT_SPEED
     ball.vy = (dy / remaining) * FLIGHT_SPEED
-    if (contestInFlight(state, flight)) return
+  }
+
+  const decayRate = flight.kind === 'pass' ? PASS_DECAY_PER_UNIT : SHOT_DECAY_PER_UNIT
+  flight.power -= travel * decayRate
+
+  if (flight.power <= 0) {
+    overhit(state, flight)
     return
   }
 
-  ball.x = flight.target.x
-  ball.y = flight.target.y
-  if (contestInFlight(state, flight)) return
-
-  if (flight.kind === 'shot') resolveShotArrival(state, flight)
-  else resolvePassArrival(state, flight)
+  if (remaining <= travel) {
+    if (flight.kind === 'shot') resolveShotArrival(state, flight)
+    else resolvePassArrival(state, flight)
+  }
 }
 
 /**
- * Let any defender near the ball reduce its power. Returns true if the ball was
- * taken, in which case the flight is over.
+ * The ball ran out of power in the air.
+ *
+ * Not a loose ball: FFX is specific that the intended receiver fumbles it and
+ * the opposition collects, so throwing beyond your range is a turnover rather
+ * than a coin toss.
  */
-function contestInFlight(state: MatchState, flight: BallFlight): boolean {
-  const defendingTeam = opponentOf(flight.fromTeam)
+function overhit(state: MatchState, flight: BallFlight): void {
+  state.phase = { kind: 'play' }
+  const claimant = nearestOpponent(state, flight.fromTeam)
 
-  for (const player of state.players) {
-    // Keepers contest at the goal line with CA, not in open water with BL.
-    if (player.team !== defendingTeam || player.slot === 'GK') continue
-    if (flight.contested.includes(player.id)) continue
-    if (distanceBetween(player, state.ball) > CONTEST_RADIUS) continue
-
-    flight.contested.push(player.id)
-
-    // A technique's inflicted condition lands on anyone who tries to cut it out,
-    // whether or not their contest actually gets through.
-    if (flight.technique?.inflicts && flight.technique.kind === 'pass') {
-      applyStatus(player, flight.technique.inflicts)
-    }
-
-    if (flight.blockersIgnored > 0) {
-      // Waved through by the technique: they reach it but cannot slow it down.
-      flight.blockersIgnored -= 1
-      continue
-    }
-
-    flight.power -= contestReduction(effectiveStat(player, 'bl'), state.rng)
-
-    if (flight.power <= 0) {
-      awardExp(state, player, 'interception')
-      giveBallTo(state, player)
-      state.phase = { kind: 'play' }
-      state.announcement = `${player.def.name} intercepts!`
-      return true
-    }
+  if (!claimant) {
+    state.ball.vx = 0
+    state.ball.vy = 0
+    return
   }
 
-  return false
+  giveBallTo(state, claimant)
+  state.announcement =
+    flight.kind === 'pass'
+      ? `Out of range — ${claimant.def.name} collects`
+      : `${claimant.def.name} gathers the loose shot`
+}
+
+/** The closest opponent to the ball, to collect an overhit throw. */
+function nearestOpponent(state: MatchState, fromTeam: TeamId): Player | undefined {
+  let best: Player | undefined
+  let bestDistance = Infinity
+
+  for (const player of state.players) {
+    if (player.team === fromTeam) continue
+    const distance = distanceBetween(player, state.ball)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = player
+    }
+  }
+  return best
 }
 
 function resolvePassArrival(state: MatchState, flight: BallFlight): void {
   const receiver = state.players.find((p) => p.id === flight.targetId)
-  state.phase = { kind: 'play' }
 
-  if (receiver) {
-    // The passer is credited, not the receiver: finding someone is the skill.
-    awardExp(state, state.players.find((p) => p.id === flight.passerId), 'pass')
-    giveBallTo(state, receiver)
-    state.announcement = `${receiver.def.name} receives`
+  if (!receiver) {
+    overhit(state, flight)
     return
   }
 
-  // The intended receiver is gone; leave it for whoever gets there first.
-  releaseBall(state)
-  state.announcement = 'Loose ball'
+  state.phase = { kind: 'play' }
+  // The passer is credited, not the receiver: finding someone is the skill.
+  awardExp(
+    state,
+    state.players.find((p) => p.id === flight.passerId),
+    'pass',
+  )
+  giveBallTo(state, receiver)
+  state.announcement = `${receiver.def.name} receives`
 }
 
+/**
+ * The shot arrives, and the keeper takes their bite out of whatever is left of
+ * it. Anything still standing after that is a goal.
+ */
 function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   const keeper = keeperFor(state, opponentOf(flight.fromTeam))
   const shooter = state.players.find((p) => p.id === flight.passerId)
   awardExp(state, shooter, 'shot')
 
-  // Shot techniques hit the keeper on arrival, before the catch is attempted, so
-  // a Nap Shot is genuinely a way through a keeper you could not otherwise beat.
+  // A shot technique lands on the keeper as it arrives, before the catch, so a
+  // Nap Shot is genuinely a way past a keeper you could not otherwise beat.
   if (keeper && flight.technique?.inflicts && flight.technique.kind === 'shoot') {
     applyStatus(keeper, flight.technique.inflicts)
   }
 
-  if (keeper && keeperSaves(flight.power, effectiveStat(keeper, 'ca'), state.rng)) {
-    awardExp(state, keeper, 'save')
-    giveBallTo(state, keeper)
-    clearAreaAroundKeeper(state, keeper)
-    state.engageCooldown = KEEPER_CLEARANCE_GRACE
-    state.phase = { kind: 'play' }
-    state.announcement = `${keeper.def.name} saves!`
-    return
+  if (keeper) {
+    flight.power -= rollStat(effectiveStat(keeper, 'ca'), state.rng)
+
+    if (flight.power <= 0) {
+      awardExp(state, keeper, 'save')
+      giveBallTo(state, keeper)
+      clearAreaAroundKeeper(state, keeper)
+      state.engageCooldown = KEEPER_CLEARANCE_GRACE
+      state.phase = { kind: 'play' }
+      state.announcement = `${keeper.def.name} saves!`
+      return
+    }
   }
 
   awardExp(state, shooter, 'goal')
   state.teams[flight.fromTeam].score += 1
   state.phase = { kind: 'celebration', scorer: flight.fromTeam, timer: CELEBRATION_SECONDS }
   state.announcement = 'GOAL!'
-  releaseBall(state)
+  state.ball.carrier = null
+  state.ball.vx = 0
+  state.ball.vy = 0
 }
 
 /** How long the goal banner holds before the restart. */
@@ -209,8 +228,6 @@ export const KEEPER_CLEARANCE_GRACE = 3
  * Without it a match reaches a stable, unwatchable equilibrium: whichever side
  * wins territory first camps in the other's box, every save hands the ball to a
  * keeper who is instantly swarmed, and the pinned team never clears its lines.
- * Mirror matches between identical teams showed one side losing 5-10 purely from
- * having conceded territory first.
  *
  * Attackers are moved towards midfield — the direction they came from — so
  * nobody is stranded behind the play.
@@ -230,8 +247,8 @@ function clearAreaAroundKeeper(state: MatchState, keeper: Player): void {
     player.y = spot.y
     player.vx = 0
     player.vy = 0
-    // Moved rather than swum: without this the renderer spends the next frames
-    // interpolating from where they used to be, drawing them in two places.
+    // Moved rather than swum: without this the renderer interpolates from where
+    // they used to be, drawing them in two places.
     recordPrevious(player)
   }
 }

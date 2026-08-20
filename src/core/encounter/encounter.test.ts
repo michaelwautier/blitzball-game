@@ -235,8 +235,9 @@ describe('breakthrough', () => {
 describe('pass and shoot', () => {
   it('sends the ball into flight towards the chosen teammate', () => {
     const state = newMatch()
-    const carrier = setUpEncounter(state, 'home:tidus', 1)
-    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    const carrier = setUpEncounter(state, 'home:tidus', 0)
+    // Nobody engaged, so nothing subtracts from the throw and it definitely flies.
+    const encounter = openEncounter(state, carrier, [])
 
     const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null })
 
@@ -251,8 +252,8 @@ describe('pass and shoot', () => {
 
   it('refuses to pass to an opponent', () => {
     const state = newMatch()
-    const carrier = setUpEncounter(state, 'home:tidus', 1)
-    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    const carrier = setUpEncounter(state, 'home:tidus', 0)
+    const encounter = openEncounter(state, carrier, [])
 
     const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null })
 
@@ -263,8 +264,8 @@ describe('pass and shoot', () => {
 
   it('sends a shot into flight at the goal', () => {
     const state = newMatch()
-    const carrier = setUpEncounter(state, 'home:wakka', 1)
-    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    const carrier = setUpEncounter(state, 'home:wakka', 0)
+    const encounter = openEncounter(state, carrier, [])
 
     resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null })
 

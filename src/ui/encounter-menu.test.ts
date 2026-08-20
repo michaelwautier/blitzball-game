@@ -54,7 +54,7 @@ function openMenu(kind: Encounter['kind'], carrierId = 'home:wakka'): MatchState
   giveBallTo(state, carrier)
 
   const defenders =
-    kind === 'contested' ? [{ id: 'away:doram', attack: 11 }] : []
+    kind === 'contested' ? [{ id: 'away:doram', attack: 11, block: 5 }] : []
 
   state.phase = {
     kind: 'encounter',
@@ -124,8 +124,10 @@ describe('what each kind of decision offers', () => {
 
   it('shows the endurance contest only when contested', () => {
     openMenu('contested')
-    expect(element.querySelector('.enc-odds')?.textContent).toContain('EN 14')
-    expect(element.querySelector('.enc-odds')?.textContent).toContain('AT 11')
+    const odds = element.querySelector('.enc-odds')?.textContent ?? ''
+    expect(odds).toContain('EN 14')
+    // A range, not a promise: the tackle is rolled when it is made.
+    expect(odds).toMatch(/AT 6–17/)
   })
 
   it('drops breakthrough when the carrier stopped by choice', () => {

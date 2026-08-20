@@ -18,8 +18,19 @@ describe('growth curves', () => {
     for (const team of TEAMS) {
       for (const player of team.roster) {
         for (const key of GROWABLE) {
-          expect(player.growth[key], `${player.name}.${key}`).toBeGreaterThan(0)
+          // Several players never gain a point of speed in the real tables, so
+          // a flat curve is data rather than a gap in it.
+          expect(player.growth[key], `${player.name}.${key}`).toBeGreaterThanOrEqual(0)
         }
+      }
+    }
+  })
+
+  it('gives every player something they actually improve at', () => {
+    for (const team of TEAMS) {
+      for (const player of team.roster) {
+        const best = Math.max(...GROWABLE.filter((k) => k !== 'hp').map((k) => player.growth[k]))
+        expect(best, `${player.name} improves at nothing`).toBeGreaterThan(0.1)
       }
     }
   })
@@ -33,8 +44,11 @@ describe('growth curves', () => {
     )
   })
 
-  it('has the star grow faster than the journeyman', () => {
-    expect(bickson.growth.sh).toBeGreaterThan(findPlayer(BESAID_AUROCHS, 'datto').growth.sh)
+  it('has the specialist grow faster at their speciality', () => {
+    // Tidus becomes the shooter; Datto stays a quick squad player.
+    expect(tidus.growth.sh).toBeGreaterThan(findPlayer(BESAID_AUROCHS, 'datto').growth.sh)
+    // Datto is the one who actually gets quicker.
+    expect(findPlayer(BESAID_AUROCHS, 'datto').growth.sp).toBeGreaterThan(tidus.growth.sp)
   })
 })
 
