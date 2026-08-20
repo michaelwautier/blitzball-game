@@ -27,6 +27,59 @@
         width: 100%;
         height: 100%;
       }
+      /* The radar: the old top-down view, kept in the corner because a camera
+         inside the pool cannot show you shape or marking. */
+      #radar {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        width: min(230px, 26vw);
+        aspect-ratio: 1;
+        border: 1px solid rgb(127 216 255 / 0.25);
+        border-radius: 12px;
+        background: rgb(4 20 34 / 0.42);
+        backdrop-filter: blur(3px);
+        opacity: 0.9;
+        pointer-events: none;
+      }
+      #scoreboard {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        pointer-events: none;
+      }
+      .score-line {
+        font: 700 22px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.03em;
+        text-shadow: 0 2px 12px rgb(0 0 0 / 0.8);
+      }
+      .score-clock {
+        margin-top: 2px;
+        font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+        opacity: 0.55;
+        text-shadow: 0 2px 8px rgb(0 0 0 / 0.8);
+      }
+      #banner {
+        position: fixed;
+        left: 50%;
+        bottom: 96px;
+        transform: translateX(-50%);
+        padding: 8px 18px;
+        border-radius: 8px;
+        background: rgb(0 0 0 / 0.55);
+        font: 600 16px ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      #banner.banner-emphatic {
+        bottom: 50%;
+        transform: translate(-50%, 50%);
+        padding: 14px 32px;
+        font: 700 44px ui-sans-serif, system-ui, sans-serif;
+        color: var(--goal, #ffd479);
+      }
       #debug {
         position: fixed;
         top: 12px;
@@ -242,6 +295,12 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <canvas id="radar"></canvas>
+    <div id="scoreboard">
+      <div class="score-line"></div>
+      <div class="score-clock"></div>
+    </div>
+    <div id="banner" hidden></div>
     <pre id="debug"></pre>
     <div id="encounter" hidden></div>
     <div id="summary" hidden></div>

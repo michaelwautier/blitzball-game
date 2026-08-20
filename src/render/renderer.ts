@@ -31,8 +31,22 @@ const COLOURS = {
   stamina: '#7ee38b',
 } as const
 
+export interface RendererOptions {
+  /**
+   * Draw as a corner radar rather than the main view: no names, no stamina
+   * rings, a transparent background, and thicker marks so bodies stay visible
+   * at a fraction of the size.
+   */
+  compact?: boolean
+}
+
 /**
- * Draws the sphere pool and everything in it.
+ * Draws the pitch from directly above.
+ *
+ * Once the scene renderer took over the main view this became the radar in the
+ * corner — the same job it always did, at a size where formation and marking
+ * read at a glance, which is exactly what a camera inside the pool cannot show
+ * you. FFX has one for the same reason.
  *
  * Play is drawn in world units: `draw` installs a transform mapping the pool
  * onto the canvas, so geometry here matches `core/pitch` exactly and no call
@@ -46,10 +60,16 @@ export class Renderer {
   private width = 0
   private height = 0
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  private readonly compact: boolean
+
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    options: RendererOptions = {},
+  ) {
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Canvas 2D context unavailable')
     this.ctx = ctx
+    this.compact = options.compact ?? false
     this.resize()
   }
 
@@ -69,8 +89,11 @@ export class Renderer {
     const dpr = window.devicePixelRatio || 1
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.fillStyle = COLOURS.background
-    ctx.fillRect(0, 0, this.width, this.height)
+    ctx.clearRect(0, 0, this.width, this.height)
+    if (!this.compact) {
+      ctx.fillStyle = COLOURS.background
+      ctx.fillRect(0, 0, this.width, this.height)
+    }
 
     // World space: origin at the centre of the canvas, 1 unit = `scale` px.
     ctx.translate(this.width / 2, this.height / 2)
@@ -91,8 +114,6 @@ export class Renderer {
 
     this.drawEncounterFocus(state)
     this.drawBall(state, alpha)
-    this.drawScoreboard(state, dpr)
-    this.drawBanner(state, dpr)
   }
 
   /**
@@ -123,6 +144,8 @@ export class Renderer {
       ctx.lineWidth = 0.45
       ctx.stroke()
 
+      if (this.compact) continue
+
       ctx.font = '600 2.6px ui-monospace, SFMono-Regular, Menlo, monospace'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -131,27 +154,6 @@ export class Renderer {
     }
   }
 
-  /** Centre-screen message: goals, saves, half time, encounter outcomes. */
-  private drawBanner(state: MatchState, dpr: number): void {
-    if (!state.announcement) return
-    const { ctx } = this
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-
-    const emphatic = state.phase.kind === 'celebration' || state.phase.kind === 'fullTime'
-    ctx.font = emphatic
-      ? '700 48px ui-sans-serif, system-ui, sans-serif'
-      : '600 17px ui-monospace, SFMono-Regular, Menlo, monospace'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-
-    const y = emphatic ? this.height / 2 : this.height - 34
-    ctx.fillStyle = 'rgb(0 0 0 / 0.55)'
-    const width = ctx.measureText(state.announcement).width + 28
-    ctx.fillRect(this.width / 2 - width / 2, y - (emphatic ? 34 : 15), width, emphatic ? 68 : 30)
-
-    ctx.fillStyle = emphatic ? COLOURS.goal : COLOURS.label
-    ctx.fillText(state.announcement, this.width / 2, y)
-  }
 
   private drawWater(): void {
     const { ctx } = this
@@ -255,6 +257,8 @@ export class Renderer {
     ctx.strokeStyle = colours.secondary
     ctx.stroke()
 
+    if (this.compact) return
+
     ctx.font = '2.2px ui-sans-serif, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -320,37 +324,4 @@ export class Renderer {
     ctx.shadowBlur = 0
   }
 
-  /** Screen-space scoreboard, so it keeps a constant size regardless of zoom. */
-  private drawScoreboard(state: MatchState, dpr: number): void {
-    const { ctx } = this
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-
-    const { home, away } = state.teams
-    // The clock counts down within the half, and stops while play is stopped.
-    const minutes = Math.floor(state.clock / 60)
-    const seconds = Math.floor(state.clock % 60)
-    const clock = `${minutes}:${seconds.toString().padStart(2, '0')}  ·  H${state.half}`
-
-    ctx.font = '600 18px ui-monospace, SFMono-Regular, Menlo, monospace'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
-
-    const centre = this.width / 2
-    ctx.fillStyle = home.def.colours.primary
-    ctx.textAlign = 'right'
-    ctx.fillText(`${home.def.abbreviation} ${home.score}`, centre - 22, 18)
-
-    ctx.fillStyle = 'rgb(255 255 255 / 0.5)'
-    ctx.textAlign = 'center'
-    ctx.fillText('–', centre, 18)
-
-    ctx.fillStyle = away.def.colours.primary
-    ctx.textAlign = 'left'
-    ctx.fillText(`${away.score} ${away.def.abbreviation}`, centre + 22, 18)
-
-    ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace'
-    ctx.fillStyle = 'rgb(255 255 255 / 0.45)'
-    ctx.textAlign = 'center'
-    ctx.fillText(clock, centre, 42)
-  }
 }
