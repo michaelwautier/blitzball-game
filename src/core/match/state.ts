@@ -240,10 +240,15 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       stepEncounter(state, dt, state.phase.encounter)
       break
     case 'flight': {
+      // Nobody swims while the ball is in the air, as in FFX: the throw has been
+      // made, and where everyone stood when it left is where it finds them. It
+      // also means a pass cannot be quietly rescued by its receiver drifting
+      // towards it, or ruined by them drifting away.
       const { flight } = state.phase
       runClock(state, dt)
       updateCondition(state, dt)
-      movePlayers(state, dt, input)
+      holdStill(state)
+      advanceLunges(state, dt)
       stepFlight(state, flight, dt)
       updateControlled(state)
       break

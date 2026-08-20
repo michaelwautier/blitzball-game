@@ -197,20 +197,22 @@ against the ladder alone.
    seconds, short enough never to bind on the engine, for the one job it is good at: stopping
    a person mashing the challenge key. With the global grace restored the ladder is identical
    to #35's, which is the point — the fix is a new option, not a change to the game's pacing.
-8. **A throw flies to where it was aimed.** Fidelity, not taste: this is how the original
-   behaves, and ours does not. Two faults, one subject. Power is currently
-   drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
-   and is collected by `nearestOpponent` — nearest to the **ball**, which is a defender
-   standing on the trajectory. That reads as an interception by someone who, by design, is not
-   allowed to intercept: only the defenders who engaged the carrier contest a throw, and they
-   did so at the encounter. It also contradicts this file, which already says the *receiver*
-   fumbles it. So: a throw always travels to its target, decay is settled on arrival, and a
-   throw that arrives spent is fumbled there — after which the ball visibly travels on to
-   whoever collects it, rather than teleporting. Second fault: the `flight` phase runs
-   `movePlayers`, so everyone swims while the ball is in the air. FFX holds them still; the
-   clock keeps running. `FLIGHT_SPEED` comes down so all of this is legible rather than
-   instantaneous. Ladder-measured — freezing removes the defensive drift that currently
-   happens during every single pass.
+8. **A throw flies to where it was aimed** ✅ (#39). Fidelity, not taste: this is how the
+   original behaves. Power is no longer drained continuously in flight — a throw covers its
+   whole distance and decay is charged on arrival — so nothing can die halfway and be picked up
+   by whoever happens to be standing there. That was reading as an interception by a defender
+   who, by the rules, cannot intercept. A throw that arrives spent is fumbled *at the
+   receiver*, and the ball then travels on to whoever collects it as a second leg with nothing
+   to contest, so the turnover is watched rather than teleported. Nobody swims while the ball
+   is in the air, as in FFX, though the clock runs and a committed lunge still plays out.
+   `FLIGHT_SPEED` is down a third, which the ladder says is free.
+   The freeze is not free, and the cost is worth knowing: goals fell from 2.37 to 1.92 a match
+   and goalless fixtures rose from 31% to 42%, because defenders no longer drift out of shape
+   while the ball travels. It also reordered the league — the Ronso went from third to first,
+   being the slowest side and therefore the one that lost least by nobody being allowed to
+   move. Measuring at the *old* flight speed gives the same 1.92, so this is the freeze, not
+   the slowdown. Winding scoring back toward 2.4 is a tuning question for its own PR rather
+   than something to smuggle into a fidelity change.
 9. **A bigger pool and a closer camera.** Two constants, but not a free change:
    `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
    most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
@@ -266,6 +268,11 @@ BES  conceded    341          304
 BES  scored      113          124
 goalless         27%          27%     (2.46 goals/match)
 ```
+
+Holding every player still while the ball is in the air (#39) cost about a fifth of all goals
+and reordered the table, which is a reminder that a rule taken purely for fidelity can be a
+balance change in disguise. It stands because the original behaves that way; whether to wind
+scoring back up is a separate decision.
 
 The most sensitive numbers, in order: `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT`, and the
 blocker coverage weights. Small moves in any of them swing the whole board — change one at a
