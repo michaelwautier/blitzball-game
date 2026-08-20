@@ -7,7 +7,7 @@ export const PLAYER_RADIUS = 2.2
 const ACCELERATION = 9
 
 /** Distance within which a player eases off rather than overshooting the target. */
-const ARRIVE_RADIUS = 4
+export const ARRIVE_RADIUS = 4
 
 /** Anything with a position, a velocity, and a record of where it was last tick. */
 export interface Movable extends Vec2 {

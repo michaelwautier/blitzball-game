@@ -20,18 +20,33 @@ export class DebugOverlay {
 
     const carrier = carrierOf(state)
     const controlled = playerById(state, state.controlled)
-    const { ball } = state
 
     this.element.textContent = [
       `fps     ${stats.fps.toFixed(0).padStart(3)}`,
-      `ticks   ${stats.ticksLastFrame} this frame / ${stats.totalTicks} total`,
-      `clock   ${state.elapsed.toFixed(1)}s`,
-      `ball    ${ball.x.toFixed(1)}, ${ball.y.toFixed(1)}`,
+      `phase   ${describePhase(state)}`,
+      `clock   ${state.clock.toFixed(1)}s  half ${state.half}`,
+      `score   ${state.teams.home.score} – ${state.teams.away.score}`,
       `holder  ${carrier ? `${carrier.def.name} (${carrier.team})` : 'loose'}`,
+      `EN      ${state.endurance}`,
       `you     ${controlled ? `${controlled.def.name} ${controlled.slot}` : '—'}`,
       '',
       'WASD / arrows to swim',
+      '1–3 in an encounter',
       '~ toggle overlay',
     ].join('\n')
+  }
+}
+
+function describePhase(state: MatchState): string {
+  const { phase } = state
+  switch (phase.kind) {
+    case 'encounter':
+      return `encounter (${phase.encounter.defenders.length} on)`
+    case 'flight':
+      return `${phase.flight.kind} in flight (${phase.flight.power.toFixed(0)})`
+    case 'celebration':
+      return `goal: ${phase.scorer}`
+    default:
+      return phase.kind
   }
 }
