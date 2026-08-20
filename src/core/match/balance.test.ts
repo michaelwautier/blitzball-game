@@ -1,91 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import {
-  HALF_SECONDS,
-  createMatch,
-  requestActionMenu,
-  stepMatch,
-  submitDefence,
-  submitEncounterAction,
-} from './state'
-import {
-  chooseEncounterAction,
-  chooseTackleTechnique,
-  shouldStopAndShoot,
-} from '../ai/decisions'
-import { autoIntent } from '../ai/autopilot'
-import { USER_TEAM } from './types'
+import { simulateMatch as playOut, type SimulatedMatch } from '../league/simulate'
 import { BESAID_AUROCHS, LUCA_GOERS, TEAMS } from '../../data/teams'
+import type { TeamDef } from '../../data/types'
 
-const TICK = 1 / 60
-
-interface MatchReport {
-  home: number
-  away: number
-  encounters: number
-  shots: number
-  breakthroughs: number
-}
+type MatchReport = SimulatedMatch
 
 /**
  * Play a full match out with both sides on AI.
  *
- * This is the payoff of a deterministic, headless core: balance is a measurement
- * rather than a feeling, and the same engine that runs on screen can be run
- * hundreds of times in a test. It is also exactly what Phase 4 will use to
- * simulate the league fixtures the user is not playing in.
+ * The simulator itself lives in `core/league`, because it is how the fixtures
+ * the user is not playing in get resolved — the same engine, formulas and AI as
+ * a match on screen. That it is also a measuring instrument is the payoff of a
+ * simulation core that never touches the renderer: balance here is a measurement
+ * rather than a feeling, and the ladder below runs it across the whole league.
  */
-function simulateMatch(
+const simulateMatch = (
   seed: string,
-  homeTeam = BESAID_AUROCHS,
-  awayTeam = LUCA_GOERS,
-): MatchReport {
-  const state = createMatch(homeTeam, awayTeam, seed)
-  const report: MatchReport = { home: 0, away: 0, encounters: 0, shots: 0, breakthroughs: 0 }
-
-  let lastPhase = state.phase.kind
-  // Generous tick ceiling: two halves plus every stoppage, and a stop if it hangs.
-  const limit = Math.ceil((HALF_SECONDS * 2 + 120) / TICK)
-
-  for (let i = 0; i < limit && state.phase.kind !== 'fullTime'; i++) {
-    // Both sides on AI: the user's player is steered by input, so without an
-    // intent they would stand still and be swarmed.
-    stepMatch(state, TICK, autoIntent(state))
-
-    // The engine opens this for the AI; the user's side needs the same prompt.
-    const onBall = state.players.find((p) => p.id === state.ball.carrier)
-    if (
-      state.phase.kind === 'play' &&
-      onBall?.team === USER_TEAM &&
-      onBall.slot !== 'GK' &&
-      shouldStopAndShoot(state, onBall)
-    ) {
-      requestActionMenu(state)
-    }
-
-    if (state.phase.kind === 'encounter' && state.phase.encounter.awaitingDefence) {
-      submitDefence(state, chooseTackleTechnique(state, state.phase.encounter))
-    }
-
-    if (state.phase.kind === 'encounter') {
-      const { encounter } = state.phase
-      if (lastPhase !== 'encounter') report.encounters++
-
-      const carrier = state.players.find((p) => p.id === encounter.carrierId)
-      if (carrier?.team === USER_TEAM) {
-        const action = chooseEncounterAction(state, encounter)
-        if (action.kind === 'shoot') report.shots++
-        if (action.kind === 'breakthrough') report.breakthroughs++
-        submitEncounterAction(state, action)
-      }
-    }
-
-    lastPhase = state.phase.kind
-  }
-
-  report.home = state.teams.home.score
-  report.away = state.teams.away.score
-  return report
-}
+  homeTeam: TeamDef = BESAID_AUROCHS,
+  awayTeam: TeamDef = LUCA_GOERS,
+): MatchReport => playOut(homeTeam, awayTeam, seed)
 
 describe('match balance', () => {
   // Twenty-four rather than a dozen: the Aurochs win roughly one match in six,
