@@ -1,131 +1,116 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BLOCK_FACTOR,
   PASS_DECAY_PER_UNIT,
-  ROLL_HEADROOM,
+  ROLL_MAX,
+  ROLL_MIN,
   SHOT_DECAY_PER_UNIT,
-  contestReduction,
-  keeperSaves,
-  passPower,
+  passDecay,
+  rollBounds,
   rollStat,
-  shotPower,
+  shotDecay,
   tackleTotal,
 } from './formulas'
 import { Rng } from '../rng'
 
-describe('rollStat', () => {
-  it('never returns less than the stat itself', () => {
+describe('rolling a contested stat', () => {
+  it('stays between half and one and a half times the stat', () => {
     const rng = new Rng(1)
-    for (let i = 0; i < 2000; i++) {
-      expect(rollStat(10, rng)).toBeGreaterThanOrEqual(10)
+    const { min, max } = rollBounds(10)
+    for (let i = 0; i < 5000; i++) {
+      const roll = rollStat(10, rng)
+      expect(roll).toBeGreaterThanOrEqual(min)
+      expect(roll).toBeLessThanOrEqual(max)
     }
   })
 
-  it('never exceeds the stat plus its headroom', () => {
+  it('reports bounds that match what it actually rolls', () => {
     const rng = new Rng(2)
-    const ceiling = 10 + Math.floor(10 * ROLL_HEADROOM)
-    for (let i = 0; i < 2000; i++) {
-      expect(rollStat(10, rng)).toBeLessThanOrEqual(ceiling)
-    }
+    const seen = new Set<number>()
+    for (let i = 0; i < 20_000; i++) seen.add(rollStat(10, rng))
+
+    const { min, max } = rollBounds(10)
+    expect(Math.min(...seen)).toBe(min)
+    expect(Math.max(...seen)).toBe(max)
+    expect(min).toBe(Math.round(10 * ROLL_MIN))
+    expect(max).toBe(Math.round(10 * ROLL_MAX))
   })
 
-  it('reaches both ends of its range', () => {
+  it('averages out near the stat itself', () => {
     const rng = new Rng(3)
-    const seen = new Set<number>()
-    for (let i = 0; i < 5000; i++) seen.add(rollStat(10, rng))
-    expect(Math.min(...seen)).toBe(10)
-    expect(Math.max(...seen)).toBe(15)
+    let total = 0
+    for (let i = 0; i < 20_000; i++) total += rollStat(12, rng)
+    expect(total / 20_000).toBeCloseTo(12, 0)
   })
 
   it('treats a zero or negative stat as nothing', () => {
     const rng = new Rng(4)
     expect(rollStat(0, rng)).toBe(0)
     expect(rollStat(-5, rng)).toBe(0)
+    expect(rollBounds(0)).toEqual({ min: 0, max: 0 })
   })
 
-  it('lets a weaker player occasionally out-roll a stronger one', () => {
+  it('never returns a negative roll', () => {
     const rng = new Rng(5)
+    for (let i = 0; i < 2000; i++) expect(rollStat(1, rng)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('lets a weak defender sometimes out-roll a strong one', () => {
+    const rng = new Rng(6)
     let upsets = 0
-    for (let i = 0; i < 2000; i++) {
-      if (rollStat(10, rng) > rollStat(12, rng)) upsets++
+    for (let i = 0; i < 5000; i++) {
+      if (rollStat(6, rng) > rollStat(9, rng)) upsets++
     }
-    // Not common, but it must be possible — that is the point of rolling.
+    // Uncommon, but the whole texture of the game depends on it being possible.
     expect(upsets).toBeGreaterThan(0)
-    expect(upsets / 2000).toBeLessThan(0.4)
+    expect(upsets / 5000).toBeLessThan(0.4)
+  })
+
+  it('can miss badly and can land heavily', () => {
+    const rng = new Rng(7)
+    const rolls = Array.from({ length: 5000 }, () => rollStat(10, rng))
+    // Half strength is a real outcome, and so is half again.
+    expect(rolls.some((r) => r <= 6)).toBe(true)
+    expect(rolls.some((r) => r >= 14)).toBe(true)
   })
 })
 
-describe('tackleTotal', () => {
-  it('is zero with nobody engaging', () => {
+describe('combined tackles', () => {
+  it('is nothing with nobody engaging', () => {
     expect(tackleTotal([], new Rng(1))).toBe(0)
   })
 
   it('grows with each additional defender', () => {
-    const one = tackleTotal([8], new Rng(9))
-    const three = tackleTotal([8, 8, 8], new Rng(9))
-    expect(three).toBeGreaterThan(one)
+    expect(tackleTotal([8, 8, 8], new Rng(9))).toBeGreaterThan(tackleTotal([8], new Rng(9)))
   })
 
-  it('is at least the sum of the raw stats', () => {
+  it('stays inside the sum of the individual bounds', () => {
     const rng = new Rng(11)
-    for (let i = 0; i < 500; i++) {
-      expect(tackleTotal([5, 7, 9], rng)).toBeGreaterThanOrEqual(21)
+    const stats = [5, 7, 9]
+    const min = stats.reduce((t, s) => t + rollBounds(s).min, 0)
+    const max = stats.reduce((t, s) => t + rollBounds(s).max, 0)
+
+    for (let i = 0; i < 2000; i++) {
+      const total = tackleTotal(stats, rng)
+      expect(total).toBeGreaterThanOrEqual(min)
+      expect(total).toBeLessThanOrEqual(max)
     }
   })
 })
 
-describe('pass and shot power', () => {
-  it('loses power with distance', () => {
-    const near = passPower(10, 0, new Rng(7))
-    const far = passPower(10, 40, new Rng(7))
-    expect(far).toBeLessThan(near)
-    expect(near - far).toBeCloseTo(40 * PASS_DECAY_PER_UNIT, 6)
+describe('distance', () => {
+  it('costs a pass power in proportion to how far it goes', () => {
+    expect(passDecay(0)).toBe(0)
+    expect(passDecay(40)).toBeCloseTo(40 * PASS_DECAY_PER_UNIT, 9)
+    expect(passDecay(80)).toBeCloseTo(passDecay(40) * 2, 9)
   })
 
-  it('decays a shot faster than a pass over the same distance', () => {
+  it('costs a shot more than a pass over the same distance', () => {
     expect(SHOT_DECAY_PER_UNIT).toBeGreaterThan(PASS_DECAY_PER_UNIT)
-    const pass = passPower(20, 30, new Rng(8))
-    const shot = shotPower(20, 30, new Rng(8))
-    expect(shot).toBeLessThan(pass)
+    expect(shotDecay(30)).toBeGreaterThan(passDecay(30))
   })
 
-  it('never goes negative, however far the attempt', () => {
-    const rng = new Rng(13)
-    expect(passPower(4, 500, rng)).toBe(0)
-    expect(shotPower(4, 500, rng)).toBe(0)
-  })
-})
-
-describe('contesting and saving', () => {
-  it('takes a fraction of a blocker s BL, not all of it', () => {
-    const rng = new Rng(17)
-    for (let i = 0; i < 500; i++) {
-      const reduction = contestReduction(10, rng)
-      expect(reduction).toBeGreaterThan(0)
-      expect(reduction).toBeLessThan(10)
-      expect(reduction).toBeLessThanOrEqual(15 * BLOCK_FACTOR)
-    }
-  })
-
-  it('has the keeper claim anything they match or beat', () => {
-    // A keeper rolling at least 12 against a shot of exactly 12 must save.
-    expect(keeperSaves(12, 12, new Rng(1))).toBe(true)
-    expect(keeperSaves(12, 20, new Rng(1))).toBe(true)
-  })
-
-  it('cannot save a shot beyond its reach', () => {
-    const rng = new Rng(19)
-    // CA 10 rolls at most 15, so a shot of 16 always beats it.
-    for (let i = 0; i < 500; i++) {
-      expect(keeperSaves(16, 10, rng)).toBe(false)
-    }
-  })
-
-  it('is contested rather than certain in the overlap', () => {
-    const rng = new Rng(23)
-    let saves = 0
-    for (let i = 0; i < 1000; i++) if (keeperSaves(13, 10, rng)) saves++
-    expect(saves).toBeGreaterThan(0)
-    expect(saves).toBeLessThan(1000)
+  it('is deterministic, unlike the contests', () => {
+    // Distance is the one part of a throw that is not a gamble.
+    expect(passDecay(17)).toBe(passDecay(17))
   })
 })

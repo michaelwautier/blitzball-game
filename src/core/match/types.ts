@@ -56,13 +56,15 @@ export type EncounterAction =
 export interface EncounterDefender {
   id: string
   /**
-   * The defender's attack stat as it stands, not a roll of it.
+   * The defender's stats as they stand, not rolls of them.
    *
-   * Each tackle is rolled when it is actually made, so the menu shows the range
-   * a carrier is up against rather than promising an outcome — barging through
-   * two defenders is a gamble, and it should look like one.
+   * Every contest is rolled when it is actually made, so the menu shows the
+   * range a carrier is up against rather than promising an outcome: barging
+   * through two defenders, or threading a ball past them, is a gamble and should
+   * look like one.
    */
   attack: number
+  block: number
 }
 
 export interface EncounterResult {
@@ -107,9 +109,7 @@ export interface BallFlight {
   target: Vec2
   /** Remaining power. Hits zero and the ball drops short. */
   power: number
-  /** Defenders who have already taken their bite, so nobody contests twice. */
-  contested: string[]
-  /** Technique used to launch it, whose effects apply on contact and arrival. */
+  /** Technique used to launch it, whose effects apply on arrival. */
   technique: Technique | null
   /** Contests still to be waved through, from the technique's `ignoresBlockers`. */
   blockersIgnored: number

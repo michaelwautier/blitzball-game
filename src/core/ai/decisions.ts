@@ -1,6 +1,6 @@
 import { GOAL_HALF_HEIGHT, goalLineX } from '../pitch'
-import { ACTION_HP_COST, CONTEST_RADIUS, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
-import { tackleRange } from '../encounter/encounter'
+import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
+import { ENGAGE_RADIUS, blockRange, tackleRange } from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
 import {
   distanceBetween,
@@ -63,7 +63,7 @@ export function chooseEncounterAction(
   const canBreakThrough =
     encounter.kind === 'contested' && encounter.endurance - expected > BREAKTHROUGH_MARGIN
 
-  if (isShotWorthTaking(state, carrier, goalDistance)) {
+  if (isShotWorthTaking(state, carrier, goalDistance, encounter)) {
     return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
   }
 
@@ -87,22 +87,32 @@ export function chooseEncounterAction(
 }
 
 /**
- * Whether a shot from here is worth taking, judged on the shot's power once
- * distance has eaten into it against the keeper the AI actually faces. Comparing
- * to the real keeper means a weak shooter respects a good goalkeeper, and a
- * strong one backs itself from further out.
+ * Whether a shot from here is worth taking.
+ *
+ * Weighed against everything it has to survive: the defenders on the carrier,
+ * the trip to goal, and finally the keeper — each judged on the middle of its
+ * range. Comparing against the real keeper means a weak shooter respects a good
+ * goalkeeper, and a strong one backs itself from further out.
  */
 export function isShotWorthTaking(
   state: MatchState,
   carrier: Player,
   goalDistance: number,
+  encounter?: Encounter,
 ): boolean {
   if (goalDistance > MAX_SHOOTING_RANGE) return false
-  if (goalDistance <= POINT_BLANK_RANGE) return true
 
-  const power = effectiveStat(carrier, 'sh') - goalDistance * SHOT_DECAY_PER_UNIT
+  const blocks = encounter ? blockRange(encounter.defenders) : { min: 0, max: 0 }
   const keeper = keeperFor(state, opponentOf(carrier.team))
   const catching = keeper ? effectiveStat(keeper, 'ca') : 0
+
+  const power =
+    effectiveStat(carrier, 'sh') -
+    (blocks.min + blocks.max) / 2 -
+    goalDistance * SHOT_DECAY_PER_UNIT
+
+  // Close in, anything that survives the defence is worth a go.
+  if (goalDistance <= POINT_BLANK_RANGE && power > 0) return true
 
   return power > catching * SHOOT_CONFIDENCE
 }
@@ -150,13 +160,18 @@ export function bestPassTarget(state: MatchState, carrier: Player): Player | und
   return bestAdvance > MIN_PASS_ADVANCE ? best : undefined
 }
 
-/** Whether an opponent is close enough to this player to contest a pass to them. */
+/**
+ * Whether an opponent is close enough to this player to be a problem.
+ *
+ * Uses the engagement radius, because that is now exactly what matters: a ball
+ * played to someone already engaged is a ball played into a challenge.
+ */
 export function isCovered(state: MatchState, player: Player): boolean {
   return state.players.some(
     (p) =>
       p.team === opponentOf(player.team) &&
       p.slot !== 'GK' &&
-      distanceBetween(p, player) <= CONTEST_RADIUS,
+      distanceBetween(p, player) <= ENGAGE_RADIUS,
   )
 }
 

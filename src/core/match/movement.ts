@@ -16,9 +16,15 @@ export interface Movable extends Vec2 {
   vy: number
 }
 
-/** Top swim speed in world units per second, derived from SP. */
+/**
+ * Top swim speed in world units per second, derived from SP.
+ *
+ * FFX's speed stat sits in the fifties to eighties rather than single figures,
+ * so the mapping is scaled to put a typical player around twelve units a second
+ * — roughly four seconds to cross the pool.
+ */
 export function maxSpeed(sp: number): number {
-  return 7 + sp * 0.5
+  return 4 + sp * 0.14
 }
 
 /** Carrying the ball costs a little pace. */
