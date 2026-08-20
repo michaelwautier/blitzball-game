@@ -12,7 +12,7 @@ import { statusLabels } from '../core/match/status'
 import { isExhausted } from '../core/match/stats'
 import { carrierOf, opponentOf, playerById } from '../core/match/queries'
 import { USER_TEAM, type MatchState, type Player } from '../core/match/state'
-import { interpolateToScene } from './projection'
+import { interpolateToScene, type Vec3 } from './projection'
 
 const COLOURS = {
   background: 0x05080f,
@@ -48,38 +48,49 @@ const CAMERA_TRAIL = POOL_RADIUS * 0.1
  */
 const CAMERA_LEAD = POOL_RADIUS * 0.1
 
-/** How much of play's travel across the pool the camera follows. */
-const DEPTH_FOLLOW = 0.35
 
 /** Seconds for the camera to cover most of the distance to where it wants to be. */
 const CAMERA_EASE = 0.5
 
 /**
- * How far out the camera may go, as a fraction of the pool.
+ * How quickly the camera answers a menu selection, rather than play.
  *
- * The camera has to stay in the water. Following play into a corner used to
- * carry it through the wall, and from outside you are looking at a sphere
- * hanging in a black void with the far side of it cutting across the frame —
- * play half hidden behind its own pool.
+ * Looking at a pass target is a response to a keypress, and at the ordinary ease
+ * it took a second and a half to arrive — so arrowing down a list of four
+ * teammates left the camera permanently sliding and never settling on any of
+ * them. That reads as lag, though it costs nothing: a preview frame measures
+ * *cheaper* than an ordinary one, at 0.045ms against 0.074ms. It was slow, not
+ * heavy.
+ *
+ * Used in both directions, so returning to the player on the ball is just as
+ * prompt as leaving them.
  */
-const CAMERA_CONFINE = 0.9
+const PREVIEW_EASE = 0.11
+
+/** Close enough to its goal to call the camera arrived, in world units. */
+const ARRIVED = 1.5
 
 /**
- * How far in front of the camera the player it is following must always be.
+ * How far the camera may sit from the middle of the pool.
  *
- * The camera trails in +z by a *damped* amount, which drifts pleasantly with
- * play in the middle of the pool and fails completely at the far edge: with the
- * damping at 0.35 and the stand-off at 0.58 of the radius, a player at the
- * bottom of the pool ends up level with the camera, and simply is not on screen.
- * Backing off further is not available either — the water is a sphere, and
- * outside it there is nothing to look at, which is what `confineToPool` exists
- * to prevent.
+ * Generous enough that it can always be a full stand-off behind whoever it is
+ * following, which near the far edge means outside the sphere looking in. That
+ * is fine: the water renders from either side, and the whole pool simply comes
+ * into view.
  *
- * So when the ideal position would leave the player behind or on top of the
- * camera, the camera gives up its trailing angle and pulls back *towards the
- * middle of the pool* instead, which is always somewhere it is allowed to be.
+ * The camera used to trail in depth by a *damped* fraction, which drifts
+ * pleasantly in the middle of the pool and fails at its edge — the camera ends
+ * up level with the player, who is then not on screen at all. The obvious
+ * repair, retreating towards the middle, is worse than the bug: it swings the
+ * camera round to the other side of the player, which flips the world against
+ * the screen and inverts the controls mid-swim.
+ *
+ * So the camera trails by the same stand-off, in the same direction, everywhere
+ * in the pool. Controls that mean one thing in the middle and the opposite at
+ * the edge are unplayable, and no framing is worth that.
  */
-const MIN_FOCUS_DISTANCE = POOL_RADIUS * 0.34
+const CAMERA_CONFINE = 1.65
+
 
 /**
  * How far the camera closes in while an encounter is being decided.
@@ -118,6 +129,10 @@ export class SceneRenderer {
   private readonly cameraGoal = new THREE.Vector3()
   private readonly lookGoal = new THREE.Vector3()
   private started = false
+  /** Who the camera was previewing last frame, to notice the selection changing. */
+  private lastFocusId: string | null = null
+  /** Answering a selection, until the camera has actually got there. */
+  private prompt = false
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -172,7 +187,7 @@ export class SceneRenderer {
     )
     this.ball.position.set(ball.x, ball.y, ball.z)
 
-    this.followPlayer(state, dt, focusId)
+    this.followPlayer(state, dt, focusId, alpha)
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -194,25 +209,21 @@ export class SceneRenderer {
    * Travel across the pool is damped, so the camera drifts in and out a little
    * with play instead of matching it and making the horizon heave.
    */
-  private followPlayer(state: MatchState, dt: number, focusId: string | null): void {
-    const focusPlayer =
-      (focusId ? playerById(state, focusId) : undefined) ??
-      playerById(state, state.controlled) ??
-      state.players[0]
-    if (!focusPlayer) return
-
-    const focus = interpolateToScene(focusPlayer, focusPlayer, 1)
+  private followPlayer(
+    state: MatchState,
+    dt: number,
+    focusId: string | null,
+    alpha: number,
+  ): void {
+    const focus = focusPoint(state, focusId, alpha)
+    if (!focus) return
     const towards = Math.sign(threatenedGoalX(state) - focus.x) || 1
 
     // Closer while a decision is open, so the defenders the menu names are
     // legible. Eased into like every other camera move, by the lerp below.
     const close = state.phase.kind === 'encounter' ? ENCOUNTER_CLOSE_IN : 1
+    cameraGoalFor(this.cameraGoal, focus, towards, close)
 
-    this.cameraGoal.set(
-      focus.x - towards * CAMERA_TRAIL * close,
-      CAMERA_HEIGHT * close,
-      focus.z * DEPTH_FOLLOW + CAMERA_BACK * close,
-    )
     // Aim a little beyond play, so the pitch sits in the middle of the frame
     // rather than riding high with empty water in the foreground.
     //
@@ -223,19 +234,26 @@ export class SceneRenderer {
     // lens. Identical in the middle of the pool, where the damped and undamped
     // depths agree.
     this.lookGoal.set(focus.x + towards * CAMERA_LEAD, 0, focus.z - POOL_RADIUS * 0.1)
-    confineToPool(this.cameraGoal)
-    keepFocusInView(this.cameraGoal, focus)
-
     if (!this.started) {
       // Do not sweep in from wherever the camera was constructed.
       this.started = true
       this.camera.position.copy(this.cameraGoal)
       this.cameraTarget.copy(this.lookGoal)
     } else {
-      const ease = 1 - Math.exp(-dt / CAMERA_EASE)
+      // A menu selection is answered promptly, and stays prompt until the camera
+      // has arrived — otherwise leaving a preview is quick and coming back from
+      // one crawls, which is the same lag in the other direction.
+      if (focusId !== this.lastFocusId) this.prompt = true
+      if (this.prompt && this.camera.position.distanceTo(this.cameraGoal) < ARRIVED) {
+        this.prompt = false
+      }
+
+      const ease = 1 - Math.exp(-dt / (this.prompt ? PREVIEW_EASE : CAMERA_EASE))
       this.camera.position.lerp(this.cameraGoal, ease)
       this.cameraTarget.lerp(this.lookGoal, ease)
     }
+
+    this.lastFocusId = focusId
 
     this.camera.lookAt(this.cameraTarget)
   }
@@ -569,35 +587,59 @@ function roundedTriangle(radius: number, corner: number): THREE.CurvePath<THREE.
 }
 
 /**
- * Pull a camera position back inside the pool.
+ * What the camera is watching, in order of what matters most at that moment.
+ *
+ * A teammate being considered for a pass, because that is a decision about
+ * somewhere else on the pitch. Then the ball, if it is in the air — a throw is
+ * the event, and staying on the player who let go of it means watching the
+ * least interesting thing in the pool. Otherwise whoever the user is steering.
+ */
+export function focusPoint(state: MatchState, focusId: string | null, alpha: number): Vec3 | null {
+  const previewed = focusId ? playerById(state, focusId) : undefined
+  if (previewed) return interpolateToScene(previewed, previewed, 1)
+
+  if (state.phase.kind === 'flight') {
+    return interpolateToScene(
+      { x: state.ball.prevX, y: state.ball.prevY },
+      state.ball,
+      alpha,
+    )
+  }
+
+  const steered = playerById(state, state.controlled) ?? state.players[0]
+  return steered ? interpolateToScene(steered, steered, 1) : null
+}
+
+/**
+ * Where the camera wants to be, given what it is following.
+ *
+ * The same stand-off, in the same direction, from anywhere in the pool — which
+ * is the property that keeps the controls meaning one thing. Exported so that
+ * can be asserted rather than hoped for.
+ */
+export function cameraGoalFor(
+  into: THREE.Vector3,
+  focus: { x: number; z: number },
+  towards: number,
+  close: number,
+): THREE.Vector3 {
+  into.set(
+    focus.x - towards * CAMERA_TRAIL * close,
+    CAMERA_HEIGHT * close,
+    focus.z + CAMERA_BACK * close,
+  )
+  confineToPool(into)
+  return into
+}
+
+/**
+ * Stop the camera wandering off altogether.
  *
  * Projected straight back along its own line from the centre, so the direction
  * it was looking from is preserved and it simply comes in closer rather than
- * swinging round to somewhere else.
+ * swinging round to somewhere else. Note the limit is well outside the water —
+ * see `CAMERA_CONFINE` for why the camera is allowed out of it.
  */
-/**
- * Guarantee the camera is actually looking at the player, not sitting on them.
- *
- * Falls back to retreating towards the centre of the pool, since that direction
- * is always available: the focus is inside the water, so anywhere between it and
- * the middle is too.
- */
-export function keepFocusInView(
-  position: THREE.Vector3,
-  focus: { x: number; z: number },
-): void {
-  const away = new THREE.Vector3(position.x - focus.x, 0, position.z - focus.z)
-  if (away.length() >= MIN_FOCUS_DISTANCE) return
-
-  // Towards the middle, or straight back if the player is standing on it.
-  const retreat = new THREE.Vector3(-focus.x, 0, -focus.z)
-  if (retreat.lengthSq() === 0) retreat.set(0, 0, 1)
-  retreat.normalize().multiplyScalar(MIN_FOCUS_DISTANCE)
-
-  position.set(focus.x + retreat.x, position.y, focus.z + retreat.z)
-  confineToPool(position)
-}
-
 export function confineToPool(position: THREE.Vector3): void {
   const limit = POOL_RADIUS * CAMERA_CONFINE
   const distance = position.length()
