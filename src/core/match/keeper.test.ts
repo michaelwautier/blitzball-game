@@ -91,7 +91,7 @@ describe('a keeper on the ball', () => {
     giveBallTo(state, keeper)
     const encounter = openDistribution(state, keeper)
 
-    const result = resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null })
+    const result = resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null, breakPast: 0 })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(keeper.id)
@@ -103,11 +103,7 @@ describe('a keeper on the ball', () => {
     giveBallTo(state, keeper)
     stepMatch(state, TICK)
 
-    expect(submitEncounterAction(state, {
-      kind: 'pass',
-      targetId: 'home:jassu',
-      techniqueId: null,
-    })).toBe(true)
+    expect(submitEncounterAction(state, { kind: 'pass', targetId: 'home:jassu', techniqueId: null, breakPast: 0 })).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })
 })

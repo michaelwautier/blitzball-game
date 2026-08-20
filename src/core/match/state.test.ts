@@ -142,8 +142,17 @@ describe('match simulation', () => {
 
   it('someone collects the loose kickoff within a few seconds', () => {
     const state = newMatch('kickoff')
-    run(state, 300)
-    expect(state.ball.carrier).not.toBeNull()
+
+    // Whether anyone *ever* took it, not whether someone happens to be holding
+    // it at the final instant: by five seconds in, the ball may perfectly well
+    // be in the air on its way to a teammate.
+    let collected = false
+    for (let i = 0; i < 300 && !collected; i++) {
+      stepMatch(state, TICK)
+      collected = state.ball.carrier !== null
+    }
+
+    expect(collected).toBe(true)
   })
 })
 

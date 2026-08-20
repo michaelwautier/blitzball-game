@@ -97,7 +97,7 @@ describe('spending stamina', () => {
     const before = carrier.hp
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'venom-shot' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'venom-shot', breakPast: 0 })
 
     const venom = findTechnique('venom-shot')
     expect(carrier.hp).toBe(before - ACTION_HP_COST.shoot - venom.hpCost)
@@ -109,10 +109,7 @@ describe('spending stamina', () => {
     carrier.hp = ACTION_HP_COST.shoot + 1
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    const result = resolveEncounter(state, encounter, {
-      kind: 'shoot',
-      techniqueId: 'venom-shot',
-    })
+    const result = resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'venom-shot', breakPast: 0 })
 
     // Still a shot, just without the technique's name or its cost.
     expect(result.success).toBe(true)
@@ -126,7 +123,7 @@ describe('spending stamina', () => {
     const before = carrier.hp
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'jecht-shot' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'jecht-shot', breakPast: 0 })
     expect(carrier.hp).toBe(before - ACTION_HP_COST.shoot)
   })
 
@@ -137,7 +134,7 @@ describe('spending stamina', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
 
     // Tidus knows Wither Pass, but it is not a shooting technique.
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'wither-pass' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'wither-pass', breakPast: 0 })
     expect(carrier.hp).toBe(before - ACTION_HP_COST.shoot)
   })
 
@@ -167,7 +164,7 @@ describe('technique effects', () => {
     expect(hasStatus(keeper, 'poison')).toBe(false)
 
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'venom-shot' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'venom-shot', breakPast: 0 })
     for (let i = 0; i < 240 && state.phase.kind === 'flight'; i++) stepMatch(state, TICK)
 
     expect(hasStatus(keeper, 'poison')).toBe(true)
@@ -180,7 +177,7 @@ describe('technique effects', () => {
     carrier.y = 0
 
     const encounter = openEncounter(state, carrier, [])
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'jecht-shot' })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: 'jecht-shot', breakPast: 0 })
 
     expect(state.phase.kind).toBe('flight')
     if (state.phase.kind === 'flight') {
@@ -203,11 +200,7 @@ describe('technique effects', () => {
     expect(engaged.length).toBeGreaterThan(0)
 
     const encounter = openEncounter(state, passer, engaged)
-    resolveEncounter(state, encounter, {
-      kind: 'pass',
-      targetId: receiver.id,
-      techniqueId: 'venom-pass',
-    })
+    resolveEncounter(state, encounter, { kind: 'pass', targetId: receiver.id, techniqueId: 'venom-pass', breakPast: 0 })
 
     // Every defender who tried to cut it out is poisoned, whether or not they did.
     for (const defender of engaged) expect(hasStatus(defender, 'poison')).toBe(true)

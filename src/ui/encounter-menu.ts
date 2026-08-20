@@ -1,5 +1,5 @@
 import { isCovered } from '../core/ai/decisions'
-import { allowedActions, tackleRange } from '../core/encounter/encounter'
+import { allowedActions, blockRange, tackleRange } from '../core/encounter/encounter'
 import { ACTION_HP_COST } from '../core/encounter/formulas'
 import { distanceBetween, outfieldTeammates, playerById } from '../core/match/queries'
 import { canAfford } from '../core/match/stats'
@@ -12,7 +12,7 @@ import {
 } from '../core/match/state'
 import { techniquesOf, type Technique } from '../data/techniques'
 
-type Mode = 'actions' | 'passTargets' | 'passTechnique' | 'shootTechnique'
+type Mode = 'actions' | 'passTargets' | 'breakPast' | 'passTechnique' | 'shootTechnique'
 
 interface Row {
   label: string
@@ -20,8 +20,12 @@ interface Row {
   tone: 'safe' | 'risky' | 'neutral'
   /** What choosing it does: commit an action, open a further step, or back out. */
   effect: { commit: EncounterAction } | { open: Mode } | { cancel: true }
-  /** Set on pass-target rows, so the receiver survives the technique step. */
+  /** Set on pass-target rows, so the receiver survives the steps that follow. */
   targetId?: string
+  /** Set on break-past rows, so the count survives the technique step. */
+  breakPast?: number
+  /** Set on the pass and shoot rows, so later steps know which throw is coming. */
+  throwKind?: 'pass' | 'shoot'
   enabled: boolean
 }
 
@@ -50,7 +54,12 @@ export class EncounterMenu {
   private signature = ''
   private rows: Row[] = []
   private pendingTargetId: string | null = null
+  /** Which throw the break-past step is feeding into. */
+  private pendingThrow: 'pass' | 'shoot' = 'shoot'
+  /** How many defenders the carrier has chosen to clear first. */
+  private pendingBreakPast = 0
   private encounterKind: Encounter['kind'] = 'contested'
+  private defenderCount = 0
 
   constructor(
     private readonly element: HTMLElement,
@@ -98,6 +107,7 @@ export class EncounterMenu {
       this.mode,
       encounter.kind,
       this.pendingTargetId ?? '',
+      this.pendingBreakPast,
       encounter.carrierId,
       ...encounter.defenders.map((d) => `${d.id}:${d.attack}`),
     ].join('|')
@@ -110,6 +120,7 @@ export class EncounterMenu {
     this.signature = ''
     this.rows = []
     this.pendingTargetId = null
+    this.pendingBreakPast = 0
     this.encounterKind = 'contested'
   }
 
@@ -120,6 +131,7 @@ export class EncounterMenu {
     if (!carrier) return
 
     this.encounterKind = encounter.kind
+    this.defenderCount = encounter.defenders.length
     this.rows = this.buildRows(state, carrier, encounter)
 
     const list = document.createElement('ul')
@@ -186,6 +198,8 @@ export class EncounterMenu {
     switch (this.mode) {
       case 'passTargets':
         return this.passTargetRows(state, carrier)
+      case 'breakPast':
+        return this.breakPastRows(carrier, encounter)
       case 'passTechnique':
         return this.techniqueRows(carrier, 'pass')
       case 'shootTechnique':
@@ -219,20 +233,31 @@ export class EncounterMenu {
         detail: 'Find a teammate in space',
         tone: 'neutral',
         effect: { open: 'passTargets' },
+        throwKind: 'pass',
         enabled: true,
       })
     }
 
     if (permitted.includes('shoot')) {
-      // Skip a technique step that would offer only the plain shot.
-      const hasTechniques = techniquesOf(carrier.def.techniques, 'shoot').length > 0
       rows.push({
         label: 'Shoot',
         detail: 'Take on the keeper',
         tone: 'neutral',
-        effect: hasTechniques
-          ? { open: 'shootTechnique' }
-          : { commit: { kind: 'shoot', techniqueId: null } },
+        effect: {
+          open:
+            encounter.defenders.length > 0
+              ? 'breakPast'
+              : techniquesOf(carrier.def.techniques, 'shoot').length > 0
+                ? 'shootTechnique'
+                : 'actions',
+        },
+        // With nobody on the carrier and no techniques there is nothing left to
+        // ask, so the row commits rather than opening a step.
+        ...(encounter.defenders.length === 0 &&
+        techniquesOf(carrier.def.techniques, 'shoot').length === 0
+          ? { effect: { commit: { kind: 'shoot' as const, techniqueId: null, breakPast: 0 } } }
+          : {}),
+        throwKind: 'shoot',
         enabled: true,
       })
     }
@@ -253,7 +278,7 @@ export class EncounterMenu {
   }
 
   private passTargetRows(state: MatchState, carrier: Player): Row[] {
-    const hasTechniques = techniquesOf(carrier.def.techniques, 'pass').length > 0
+    const next = this.afterTargetChosen(carrier)
 
     // Nearest first. A pass loses power over the distance it travels, so the
     // top of the list is the safest ball rather than the most ambitious one, and
@@ -267,14 +292,84 @@ export class EncounterMenu {
           detail: `${mate.slot} · ${distanceBetween(carrier, mate).toFixed(0)}m · ${covered ? 'marked' : 'free'}`,
           tone: covered ? ('risky' as const) : ('safe' as const),
           targetId: mate.id,
-          effect: hasTechniques
-            ? ({ open: 'passTechnique' } as const)
-            : ({
-                commit: { kind: 'pass' as const, targetId: mate.id, techniqueId: null },
-              } as const),
+          effect: next(mate.id),
           enabled: true,
         }
       })
+  }
+
+  /**
+   * Where choosing a receiver leads: the break-past step if anyone is on the
+   * carrier, then techniques if they have any, and otherwise straight to the ball.
+   */
+  private afterTargetChosen(carrier: Player): (targetId: string) => Row['effect'] {
+    if (this.defenderCount > 0) return () => ({ open: 'breakPast' })
+    if (techniquesOf(carrier.def.techniques, 'pass').length > 0) {
+      return () => ({ open: 'passTechnique' })
+    }
+    return (targetId) => ({
+      commit: { kind: 'pass', targetId, techniqueId: null, breakPast: 0 },
+    })
+  }
+
+  /**
+   * How many defenders to get past before throwing.
+   *
+   * Clearing someone costs endurance against their attack, and takes their
+   * blocking out of the throw that follows. The rows show both sides of that
+   * trade, so the decision is made on the numbers rather than on a hunch.
+   */
+  private breakPastRows(carrier: Player, encounter: Encounter): Row[] {
+    const stat = this.pendingThrow === 'pass' ? 'pa' : 'sh'
+    const power = carrier.stats[stat]
+    const label = stat.toUpperCase()
+
+    // Counts from nobody up to all of them, so the full choice is on offer.
+    return Array.from({ length: encounter.defenders.length + 1 }, (_, count) => {
+      const cost = tackleRange(encounter.defenders.slice(0, count))
+      const facing = blockRange(encounter.defenders.slice(count))
+      const survives = power - facing.max > 0
+
+      return {
+        label: count === 0 ? 'Throw through them' : `Get past ${count}`,
+        detail:
+          `${label} ${power} vs BL ${facing.min}–${facing.max}` +
+          (count > 0 ? ` · costs EN ${cost.min}–${cost.max}` : ''),
+        tone: survives ? ('safe' as const) : ('risky' as const),
+        effect: this.afterBreakPastChosen(carrier, count),
+        breakPast: count,
+        enabled: count === 0 || cost.max < encounter.endurance,
+      }
+    })
+  }
+
+  /**
+   * Where choosing how many to clear leads: the technique step if the carrier
+   * has any for this throw, and otherwise straight to making it.
+   */
+  private afterBreakPastChosen(carrier: Player, count: number): Row['effect'] {
+    const kind = this.pendingThrow
+    if (techniquesOf(carrier.def.techniques, kind).length > 0) {
+      return { open: kind === 'pass' ? 'passTechnique' : 'shootTechnique' }
+    }
+    return { commit: this.throwAction(kind, null, count) }
+  }
+
+  /** Assemble a throw from everything gathered across the steps. */
+  private throwAction(
+    kind: 'pass' | 'shoot',
+    technique: Technique | null,
+    breakPast = this.pendingBreakPast,
+  ): EncounterAction {
+    if (kind === 'shoot') {
+      return { kind: 'shoot', techniqueId: technique?.id ?? null, breakPast }
+    }
+    return {
+      kind: 'pass',
+      targetId: this.pendingTargetId ?? '',
+      techniqueId: technique?.id ?? null,
+      breakPast,
+    }
   }
 
   /** The plain action first, then each learned technique with its HP price. */
@@ -303,12 +398,7 @@ export class EncounterMenu {
   }
 
   private actionFor(kind: 'pass' | 'shoot', technique: Technique | null): EncounterAction {
-    if (kind === 'shoot') return { kind: 'shoot', techniqueId: technique?.id ?? null }
-    return {
-      kind: 'pass',
-      targetId: this.pendingTargetId ?? '',
-      techniqueId: technique?.id ?? null,
-    }
+    return this.throwAction(kind, technique)
   }
 
   private renderRow(row: Row, key: number): HTMLElement {
@@ -364,16 +454,38 @@ export class EncounterMenu {
       return
     }
 
-    this.mode = this.mode === 'passTechnique' ? 'passTargets' : 'actions'
+    this.mode = this.previousStep()
     this.signature = ''
+  }
+
+  /** One step back through whichever chain of questions is being asked. */
+  private previousStep(): Mode {
+    switch (this.mode) {
+      case 'passTechnique':
+      case 'shootTechnique':
+        return this.defenderCount > 0
+          ? 'breakPast'
+          : this.pendingThrow === 'pass'
+            ? 'passTargets'
+            : 'actions'
+      case 'breakPast':
+        return this.pendingThrow === 'pass' ? 'passTargets' : 'actions'
+      default:
+        return 'actions'
+    }
   }
 
   private choose(key: number): void {
     const row = this.rows[key - 1]
     if (!row || !row.enabled) return
 
-    // Remember the receiver before any technique step overwrites the rows.
+    // Remember what each step chose before the next one overwrites the rows.
+    // Recorded on selection rather than while building the rows: doing it during
+    // the build left the pending throw set to whichever row happened to be
+    // constructed last.
+    if (row.throwKind) this.pendingThrow = row.throwKind
     if (row.targetId) this.pendingTargetId = row.targetId
+    if (row.breakPast !== undefined) this.pendingBreakPast = row.breakPast
 
     if ('cancel' in row.effect) {
       this.handlers.onCancel()
