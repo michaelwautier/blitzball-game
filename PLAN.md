@@ -176,10 +176,12 @@ against the ladder alone.
    with encounters unmoved. Labels became distance-scaled in the same change, since the closer
    camera turned a nearby player's name into a quarter of the screen.
 6. **Arrow-key selection** ✅ (#36). Move through the encounter options with the arrows and
-   confirm with space or enter; the number keys stay as a direct shortcut, and hovering moves
-   the highlight so mouse and keyboard never point at different rows. Wraps at both ends and
-   skips options that cannot be chosen — an unaffordable technique stays visible, because that
-   is information, but holding an arrow never gets stuck on it. UI only.
+   confirm with space or enter, with an FFX cursor marking the choice. Hovering moves the
+   highlight too, so mouse and keyboard never point at different rows. It wraps at both ends
+   and skips options that cannot be chosen — an unaffordable technique stays visible, because
+   that is information, but holding an arrow never gets stuck on it. The number keys are gone
+   rather than kept as a shortcut: they were redundant the moment this existed, and the row
+   chips were noise in a box that had just been narrowed. UI only.
 7. **Make defending feel like defending.** `engageCooldown` is a single global timer, so every
    reception and every completed throw blacks out *all* encounters for four seconds — and on
    top of that, attacking has an override that defending does not: `requestActionMenu` (the

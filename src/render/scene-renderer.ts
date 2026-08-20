@@ -436,20 +436,29 @@ function ring(radius: number, thickness: number, colour: number, opacity: number
  * Sprites rather than 3D text: names have to stay legible from anywhere in the
  * pool, and a mesh would turn edge-on and disappear.
  */
-/** A label's size in world units at `LABEL_REFERENCE_DISTANCE` from the camera. */
-const LABEL_WIDTH = 14
-const LABEL_HEIGHT = 3.5
+/**
+ * A label's size in world units at `LABEL_REFERENCE_DISTANCE` from the camera.
+ *
+ * Sized so that, scaled proportionally, a name comes out around a fifth the
+ * height of a body on screen — a caption rather than a banner.
+ */
+const LABEL_WIDTH = 9
+const LABEL_HEIGHT = 2.25
 
 /** The distance labels are sized for; nearer or further, they are scaled to match. */
 const LABEL_REFERENCE_DISTANCE = POOL_RADIUS * 0.62
 /**
- * Low, deliberately. The floor applies to players *near* the camera — their
- * label needs to be small in the world to come out ordinary on screen — so a
- * generous floor is exactly what leaves a nearby name filling the frame.
+ * The clamps only catch the extremes; almost every label sits between them and
+ * is therefore a constant size on screen.
+ *
+ * The floor applies to players *near* the camera, whose labels must be small in
+ * the world to come out ordinary on screen — so it is set low enough to stay out
+ * of the way. A generous floor is precisely what leaves a nearby name filling
+ * the frame, which is the bug this replaced. The ceiling applies to the far
+ * side of the pool and only stops a label growing absurdly in world space.
  */
-const LABEL_MIN_SCALE = 0.18
-/** The ceiling applies to distant players, and only stops labels growing absurdly. */
-const LABEL_MAX_SCALE = 1.9
+const LABEL_MIN_SCALE = 0.04
+const LABEL_MAX_SCALE = 3.4
 
 function clamp(value: number, low: number, high: number): number {
   return Math.max(low, Math.min(high, value))

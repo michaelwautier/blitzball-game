@@ -181,9 +181,7 @@ export class EncounterMenu {
 
     const hint = document.createElement('div')
     hint.className = 'enc-hint'
-    hint.textContent =
-      `↑↓ choose · space to confirm · 1–${this.rows.length} direct` +
-      (this.canGoBack() ? ' · Esc back' : '')
+    hint.textContent = `↑↓ choose · space to confirm${this.canGoBack() ? ' · Esc back' : ''}`
 
     this.element.replaceChildren(
       this.renderHeading(state, carrier, encounter),
@@ -481,10 +479,8 @@ export class EncounterMenu {
     button.className = `enc-option enc-${row.tone}`
     button.dataset.key = String(key)
     button.disabled = !row.enabled
-    // Built as nodes rather than markup: rows now carry player names, and names
-    // are data. Nothing here should be able to become an element.
-    const kbd = document.createElement('kbd')
-    kbd.textContent = String(key)
+    // Built as nodes rather than markup: rows carry player names, and names are
+    // data. Nothing here should be able to become an element.
     const label = document.createElement('span')
     label.className = 'enc-label'
     label.textContent = row.label
@@ -492,7 +488,7 @@ export class EncounterMenu {
     detail.className = 'enc-detail'
     detail.textContent = row.detail
 
-    button.append(kbd, label, detail)
+    button.append(label, detail)
     item.append(button)
     return item
   }
@@ -545,13 +541,6 @@ export class EncounterMenu {
     // Space would otherwise scroll the page, and Enter is the other habit.
     if (event.key === ' ' || event.key === 'Enter') {
       this.choose(this.selected + 1)
-      event.preventDefault()
-      return
-    }
-
-    const key = Number(event.key)
-    if (Number.isInteger(key) && key >= 1 && key <= 9) {
-      this.choose(key)
       event.preventDefault()
     }
   }
