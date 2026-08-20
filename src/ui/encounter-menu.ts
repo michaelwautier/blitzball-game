@@ -18,8 +18,8 @@ interface Row {
   label: string
   detail: string
   tone: 'safe' | 'risky' | 'neutral'
-  /** What choosing it does: commit an action, or open a further step. */
-  effect: { commit: EncounterAction } | { open: Mode }
+  /** What choosing it does: commit an action, open a further step, or back out. */
+  effect: { commit: EncounterAction } | { open: Mode } | { cancel: true }
   /** Set on pass-target rows, so the receiver survives the technique step. */
   targetId?: string
   enabled: boolean
@@ -240,6 +240,18 @@ export class EncounterMenu {
       })
     }
 
+    // Stopping was the player's own choice, so leaving has to be a visible one
+    // too. Escape does the same thing, but nothing on screen says so.
+    if (encounter.kind === 'onTheBall') {
+      rows.push({
+        label: 'Keep swimming',
+        detail: 'Carry on with the ball',
+        tone: 'neutral',
+        effect: { cancel: true },
+        enabled: true,
+      })
+    }
+
     return rows
   }
 
@@ -362,6 +374,11 @@ export class EncounterMenu {
 
     // Remember the receiver before any technique step overwrites the rows.
     if (row.targetId) this.pendingTargetId = row.targetId
+
+    if ('cancel' in row.effect) {
+      this.handlers.onCancel()
+      return
+    }
 
     if ('commit' in row.effect) {
       this.handlers.onAction(row.effect.commit)
