@@ -167,7 +167,8 @@ const loop = createLoop({
   render: (alpha) => {
     if (!state || !sides) return
 
-    scene.draw(state, alpha, TICK_SECONDS)
+    // Look at whoever is being considered as a pass target, if anyone is.
+    scene.draw(state, alpha, TICK_SECONDS, menu.previewTargetId())
     radar.draw(state, alpha)
     scoreboard.update(state)
     statPanel.update(state)

@@ -217,6 +217,17 @@ against the ladder alone.
    `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
    most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
    goals a match rather than accepting whatever falls out.
+11. **Camera: keep the player on screen, and look where you are passing** ✅ (#40). Pulled
+    forward out of order, being a bug plus a small feature rather than the balance-affecting
+    resize in 9. Two faults, both at the pool's edge: the camera trails in depth by a *damped*
+    amount, so a player at the bottom of the pool ended up level with it and off screen, and
+    the look target was damped the same way, so once the position was fixed the camera stood
+    correctly behind the player and then looked past them towards the middle. Backing further
+    off is not available — outside the water sphere there is nothing to render — so the camera
+    now retreats towards the centre of the pool instead, which is always somewhere it is
+    allowed to be. And while a pass target is being chosen the camera looks at the candidate,
+    since choosing a destination from a list of names while staring at the passer is choosing
+    blind.
 10. **Team strategies.** The first genuinely tactical decision the user gets. Each side plays a
     defensive shape with real trade-offs — pressing commits everyone to the carrier and leaves
     the passing lanes open; zone holds shape and concedes the carrier room; man-marking sits

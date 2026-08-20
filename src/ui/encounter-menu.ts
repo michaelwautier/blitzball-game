@@ -120,6 +120,21 @@ export class EncounterMenu {
     this.render(state)
   }
 
+  /**
+   * The teammate currently under the cursor while choosing a pass, if any.
+   *
+   * Offered so the camera can look at whoever is being considered — a pass is a
+   * decision about somewhere else on the pitch, and choosing one from a list of
+   * names while staring at the passer is choosing blind.
+   *
+   * Deliberately a question the renderer asks rather than something written into
+   * match state: which row a menu is highlighting is not part of the game.
+   */
+  previewTargetId(): string | null {
+    if (this.element.hidden || this.mode !== 'passTargets') return null
+    return this.rows[this.selected]?.targetId ?? null
+  }
+
   dispose(): void {
     this.element.removeEventListener('click', this.onClick)
     this.element.removeEventListener('pointermove', this.onPointerMove)
