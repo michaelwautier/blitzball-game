@@ -1,6 +1,6 @@
 import type { Rng } from '../rng'
 import type { Side, Vec2 } from '../pitch'
-import type { PlayerDef, PositionKey, TeamDef } from '../../data/types'
+import type { PlayerDef, PlayerStats, PositionKey, TeamDef } from '../../data/types'
 import type { Technique } from '../../data/techniques'
 import type { StatusEffect } from './status'
 import type { Movable } from './movement'
@@ -16,6 +16,12 @@ export interface Player extends Movable {
   def: PlayerDef
   team: TeamId
   slot: PositionKey
+  /**
+   * Stats as this player is right now: their base plus whatever their career
+   * has earned. Snapshotted when the match is built, so the engine never needs
+   * to know that careers exist.
+   */
+  stats: PlayerStats
   /** Doubles as stamina: actions and techniques spend it, poison drains it. */
   hp: number
   /** Conditions currently affecting this player. */
@@ -88,6 +94,8 @@ export interface Encounter {
 export interface BallFlight {
   kind: 'pass' | 'shot'
   fromTeam: TeamId
+  /** Who launched it, so the credit for it can find them later. */
+  passerId: string
   /** Intended receiver for a pass; null for a shot. */
   targetId: string | null
   target: Vec2
@@ -131,6 +139,8 @@ export interface MatchState {
    * Each breakthrough drains it, so a carrier cannot barge through forever.
    */
   endurance: number
+  /** Experience earned this match, by player id. */
+  exp: Record<string, number>
   /**
    * Most recent notable event, for the on-screen banner. Kept out of the phase
    * machine so a message can outlive the phase that produced it — a shot's

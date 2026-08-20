@@ -5,27 +5,51 @@ import {
   requestActionMenu,
   stepMatch,
   submitEncounterAction,
+  type MatchState,
 } from './core/match/state'
+import { Squad } from './core/progression/squad'
 import { BESAID_AUROCHS, LUCA_GOERS } from './data/teams'
 import { KeyboardInput } from './input/keyboard'
 import { Renderer } from './render/renderer'
 import { DebugOverlay } from './ui/debug-overlay'
 import { EncounterMenu } from './ui/encounter-menu'
+import { MatchSummary } from './ui/match-summary'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')
 const debugElement = document.querySelector<HTMLElement>('#debug')
 const encounterElement = document.querySelector<HTMLElement>('#encounter')
-if (!canvas || !debugElement || !encounterElement) {
-  throw new Error('Missing #game canvas, #debug overlay, or #encounter menu')
+const summaryElement = document.querySelector<HTMLElement>('#summary')
+if (!canvas || !debugElement || !encounterElement || !summaryElement) {
+  throw new Error('Missing #game, #debug, #encounter, or #summary')
 }
 
 const renderer = new Renderer(canvas)
 const overlay = new DebugOverlay(debugElement)
 const input = new KeyboardInput()
-const state = createMatch(BESAID_AUROCHS, LUCA_GOERS, `blitzball-${Date.now()}`)
+
+/**
+ * Careers persist across matches for the session, so the "next match" button
+ * fields the squad that just played rather than a fresh one. Phase 4 will put
+ * this behind a save file.
+ */
+const squad = new Squad()
+
+let state = newMatch()
+/** Computed once when the match ends, so re-rendering cannot bank it twice. */
+let progress: ReturnType<Squad['applyMatch']> | null = null
+
+function newMatch(): MatchState {
+  return createMatch(BESAID_AUROCHS, LUCA_GOERS, `blitzball-${Date.now()}`, squad.lookup)
+}
+
 const menu = new EncounterMenu(encounterElement, {
   onAction: (action) => submitEncounterAction(state, action),
   onCancel: () => cancelActionMenu(state),
+})
+
+const summary = new MatchSummary(summaryElement, () => {
+  state = newMatch()
+  progress = null
 })
 
 const loop = createLoop({
@@ -33,6 +57,12 @@ const loop = createLoop({
   render: (alpha) => {
     renderer.draw(state, alpha)
     menu.update(state)
+    summary.update(state, () => {
+      // Banked exactly once: the summary asks for this only on the frame the
+      // match ends, and the result is held until the next match replaces it.
+      progress ??= squad.applyMatch(state, { home: BESAID_AUROCHS, away: LUCA_GOERS })
+      return progress
+    })
     overlay.update(loop.stats, state)
   },
 })
@@ -61,11 +91,15 @@ loop.start()
 if (import.meta.env.DEV) {
   Object.assign(window, {
     blitzball: {
-      state,
+      get state() {
+        return state
+      },
+      squad,
       loop,
       input,
       renderer,
       menu,
+      summary,
       stepMatch,
       submitEncounterAction,
       requestActionMenu,

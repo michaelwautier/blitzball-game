@@ -4,6 +4,7 @@ import { attackDirection } from './formation'
 import { PLAYER_RADIUS } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
 import { giveBallTo, releaseBall } from './possession'
+import { awardExp } from './exp'
 import { applyStatus } from './status'
 import { effectiveStat } from './stats'
 import type { Technique } from '../../data/techniques'
@@ -23,6 +24,7 @@ export function startPass(
   return {
     kind: 'pass',
     fromTeam: passer.team,
+    passerId: passer.id,
     targetId: receiver.id,
     target: { x: receiver.x, y: receiver.y },
     power: base + (technique?.power ?? 0),
@@ -43,6 +45,7 @@ export function startShot(
   return {
     kind: 'shot',
     fromTeam: shooter.team,
+    passerId: shooter.id,
     targetId: null,
     target,
     power: base + (technique?.power ?? 0),
@@ -135,6 +138,7 @@ function contestInFlight(state: MatchState, flight: BallFlight): boolean {
     flight.power -= contestReduction(effectiveStat(player, 'bl'), state.rng)
 
     if (flight.power <= 0) {
+      awardExp(state, player, 'interception')
       giveBallTo(state, player)
       state.phase = { kind: 'play' }
       state.announcement = `${player.def.name} intercepts!`
@@ -150,6 +154,8 @@ function resolvePassArrival(state: MatchState, flight: BallFlight): void {
   state.phase = { kind: 'play' }
 
   if (receiver) {
+    // The passer is credited, not the receiver: finding someone is the skill.
+    awardExp(state, state.players.find((p) => p.id === flight.passerId), 'pass')
     giveBallTo(state, receiver)
     state.announcement = `${receiver.def.name} receives`
     return
@@ -162,6 +168,8 @@ function resolvePassArrival(state: MatchState, flight: BallFlight): void {
 
 function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   const keeper = keeperFor(state, opponentOf(flight.fromTeam))
+  const shooter = state.players.find((p) => p.id === flight.passerId)
+  awardExp(state, shooter, 'shot')
 
   // Shot techniques hit the keeper on arrival, before the catch is attempted, so
   // a Nap Shot is genuinely a way through a keeper you could not otherwise beat.
@@ -170,6 +178,7 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   }
 
   if (keeper && keeperSaves(flight.power, effectiveStat(keeper, 'ca'), state.rng)) {
+    awardExp(state, keeper, 'save')
     giveBallTo(state, keeper)
     clearAreaAroundKeeper(state, keeper)
     state.engageCooldown = KEEPER_CLEARANCE_GRACE
@@ -178,6 +187,7 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
     return
   }
 
+  awardExp(state, shooter, 'goal')
   state.teams[flight.fromTeam].score += 1
   state.phase = { kind: 'celebration', scorer: flight.fromTeam, timer: CELEBRATION_SECONDS }
   state.announcement = 'GOAL!'

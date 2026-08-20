@@ -154,7 +154,7 @@ export class EncounterMenu {
 
     const hp = document.createElement('span')
     hp.className = 'enc-hp'
-    hp.textContent = `HP ${Math.round(carrier.hp)}/${carrier.def.stats.hp}`
+    hp.textContent = `HP ${Math.round(carrier.hp)}/${carrier.stats.hp}`
     heading.append(hp)
 
     return heading

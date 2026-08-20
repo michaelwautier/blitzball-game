@@ -1,4 +1,5 @@
 import { Rng } from '../rng'
+import { currentStats, type PlayerCareer } from '../progression/career'
 import { BALL_RADIUS, POOL_RADIUS, clampToPool } from '../pitch'
 import { POSITION_KEYS, type TeamDef } from '../../data/types'
 import { findPlayer } from '../../data/teams'
@@ -62,7 +63,18 @@ const WALL_RESTITUTION = 0.6
  */
 const SEPARATION_PASSES = 2
 
-export function createMatch(home: TeamDef, away: TeamDef, seed: number | string): MatchState {
+/**
+ * Careers to build a match from, keyed by the id the player has in a match
+ * (`home:tidus`). Anything missing simply starts at level one.
+ */
+export type CareerLookup = (playerId: string) => PlayerCareer | undefined
+
+export function createMatch(
+  home: TeamDef,
+  away: TeamDef,
+  seed: number | string,
+  careers: CareerLookup = () => undefined,
+): MatchState {
   const rng = typeof seed === 'string' ? Rng.fromString(seed) : new Rng(seed)
 
   const teams: Record<TeamId, TeamState> = {
@@ -77,12 +89,13 @@ export function createMatch(home: TeamDef, away: TeamDef, seed: number | string)
     phase: { kind: 'play' },
     rng,
     teams,
-    players: [...buildSide(teams.home), ...buildSide(teams.away)],
+    players: [...buildSide(teams.home, careers), ...buildSide(teams.away, careers)],
     ball: { x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0, carrier: null },
     controlled: '',
     pickupCooldown: 0,
     engageCooldown: 0,
     endurance: 0,
+    exp: {},
     announcement: null,
     announcementTimer: 0,
   }
@@ -91,12 +104,15 @@ export function createMatch(home: TeamDef, away: TeamDef, seed: number | string)
   return state
 }
 
-function buildSide(team: TeamState): Player[] {
+function buildSide(team: TeamState, careers: CareerLookup): Player[] {
   return POSITION_KEYS.map((slot) => {
     const def = findPlayer(team.def, team.def.lineup[slot])
     const spot = kickoffPosition(slot, team.defending)
+    const id = `${team.id}:${def.id}`
+    // Snapshotted once, so the engine never has to know careers exist.
+    const stats = currentStats(def, careers(id))
     return {
-      id: `${team.id}:${def.id}`,
+      id,
       def,
       team: team.id,
       slot,
@@ -106,7 +122,8 @@ function buildSide(team: TeamState): Player[] {
       prevY: spot.y,
       vx: 0,
       vy: 0,
-      hp: def.stats.hp,
+      stats,
+      hp: stats.hp,
       statuses: [],
     }
   })
@@ -214,7 +231,7 @@ function updateCondition(state: MatchState, dt: number): void {
   for (const player of state.players) {
     tickStatuses(player, dt)
     if (state.ball.carrier === player.id) continue
-    player.hp = Math.min(player.def.stats.hp, player.hp + HP_REGEN_PER_SECOND * dt)
+    player.hp = Math.min(player.stats.hp, player.hp + HP_REGEN_PER_SECOND * dt)
   }
 }
 

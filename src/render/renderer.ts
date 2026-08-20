@@ -276,7 +276,7 @@ export class Renderer {
    * immediately obvious — HP is a resource you have to be able to see to manage.
    */
   private drawStamina(player: Player, x: number, y: number): void {
-    const fraction = player.hp / player.def.stats.hp
+    const fraction = player.hp / player.stats.hp
     if (fraction >= 1) return
 
     const { ctx } = this

@@ -15,6 +15,7 @@ import { ACTION_HP_COST, rollStat } from './formulas'
 import { findTechnique, techniquesOf, type Technique } from '../../data/techniques'
 import { applyStatus } from '../match/status'
 import { canAfford, effectiveStat, spendHp } from '../match/stats'
+import { awardExp } from '../match/exp'
 
 /**
  * How close a defender must be to drag the carrier into an encounter.
@@ -185,6 +186,7 @@ function resolveBreakthrough(
 
   if (remaining > 0) {
     state.engageCooldown = BREAKTHROUGH_GRACE
+    awardExp(state, carrier, 'breakthrough')
     return {
       action: 'breakthrough',
       success: true,
@@ -197,6 +199,7 @@ function resolveBreakthrough(
   const tackler = playerById(state, strongest.id)
 
   let techniqueNote = ''
+  awardExp(state, tackler, 'tackle')
   if (tackler) {
     const technique = useTackleTechnique(tackler, carrier)
     if (technique) techniqueNote = ` · ${technique.name}!`

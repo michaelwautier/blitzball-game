@@ -87,9 +87,11 @@ Shot, Nap Shot, Venom Pass, Wither Pass, Venom Tackle, Wither Tackle) with poiso
 and wither, shown in the encounter menu with their HP price; per-player technique lists;
 stamina rings and condition markers on the pitch.
 
-### Phase 3 — EXP & leveling
-EXP per contested action, level-up between matches with growth curves per player,
-post-match summary screen showing EXP gains and stat changes.
+### Phase 3 — EXP & leveling ✅ (PR #9)
+EXP per contested action, level-up between matches along per-player growth curves, and a
+full-time summary showing what everyone earned and what it bought. Careers are held
+separately from the roster data, so a match is built from a snapshot of current stats and
+the engine never needs to know progression exists.
 
 ### Phase 4 — League & recruiting
 Fixture list for all 6 teams; other fixtures auto-simmed headlessly with the same engine;
