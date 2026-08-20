@@ -9,15 +9,27 @@ import {
   switchControlled,
   type MatchState,
 } from './core/match/state'
+import { USER_TEAM } from './core/match/types'
+import {
+  createSeason,
+  fixtureSeed,
+  nextUserFixture,
+  recordResult,
+  simulateRound,
+  type Season,
+} from './core/league/season'
+import { deserialise, localStorageSlot, serialise } from './core/league/save'
 import { Squad } from './core/progression/squad'
-import { BESAID_AUROCHS, LUCA_GOERS } from './data/teams'
+import { TEAMS, findTeam } from './data/teams'
 import { KeyboardInput } from './input/keyboard'
 import { Renderer } from './render/renderer'
 import { SceneRenderer } from './render/scene-renderer'
 import { DebugOverlay } from './ui/debug-overlay'
 import { EncounterMenu } from './ui/encounter-menu'
+import { LeagueScreen } from './ui/league-screen'
 import { MatchSummary } from './ui/match-summary'
 import { Scoreboard } from './ui/scoreboard'
+import type { TeamDef } from './data/types'
 
 const element = <T extends HTMLElement>(selector: string): T => {
   const found = document.querySelector<T>(selector)
@@ -25,41 +37,130 @@ const element = <T extends HTMLElement>(selector: string): T => {
   return found
 }
 
+/** The side the user manages. The Aurochs, as in the story. */
+const MY_TEAM = 'aurochs'
+
 const scene = new SceneRenderer(element<HTMLCanvasElement>('#game'))
 // The same top-down renderer as before, now shrunk into the corner.
 const radar = new Renderer(element<HTMLCanvasElement>('#radar'), { compact: true })
 const scoreboard = new Scoreboard(element('#scoreboard'), element('#banner'))
 const overlay = new DebugOverlay(element('#debug'))
 const input = new KeyboardInput()
+const slot = localStorageSlot()
+
+const restored = deserialise(slot.read())
+let season: Season =
+  restored?.season ??
+  createSeason(
+    TEAMS.map((team) => team.id),
+    MY_TEAM,
+    `blitzball-${Date.now()}`,
+  )
+const squad = new Squad(restored?.careers)
 
 /**
- * Careers persist across matches for the session, so the "next match" button
- * fields the squad that just played. Phase 4 will put this behind a save file.
+ * The match being played, if any.
+ *
+ * Null while the league screen is up. The loop skips stepping and drawing
+ * entirely rather than running a match nobody is looking at.
  */
-const squad = new Squad()
-
-let state = newMatch()
+let state: MatchState | null = null
+/** The two sides of the current match, as the engine sees them. */
+let sides: Record<'home' | 'away', TeamDef> | null = null
 /** Computed once when the match ends, so re-rendering cannot bank it twice. */
 let progress: ReturnType<Squad['applyMatch']> | null = null
 
-function newMatch(): MatchState {
-  return createMatch(BESAID_AUROCHS, LUCA_GOERS, `blitzball-${Date.now()}`, squad.lookup)
+const league = new LeagueScreen(element('#league'), () => startNextMatch())
+const menu = new EncounterMenu(element('#encounter'), {
+  onAction: (action) => (state ? submitEncounterAction(state, action) : false),
+  onDefend: (techniqueId) => (state ? submitDefence(state, techniqueId) : false),
+  onCancel: () => (state ? cancelActionMenu(state) : false),
+})
+const summary = new MatchSummary(
+  element('#summary'),
+  () => returnToLeague(),
+  () => season.userTeamId,
+)
+
+/**
+ * Play the user's next fixture.
+ *
+ * The user's side always takes the engine's `home` slot, whichever end of the
+ * fixture they are really at: `USER_TEAM` is what tells the engine which side a
+ * person is steering, and the two ends of the pool are worth the same — the
+ * mirror-fixture tests exist to keep them that way. The fixture's own
+ * orientation is restored when the result is recorded.
+ */
+function startNextMatch(): void {
+  const fixture = nextUserFixture(season)
+  if (!fixture) return
+
+  const mine = findTeam(season.userTeamId)
+  const theirs = findTeam(fixture.home === season.userTeamId ? fixture.away : fixture.home)
+
+  sides = { home: mine, away: theirs }
+  state = createMatch(mine, theirs, fixtureSeed(season, fixture), squad.lookupFor(sides))
+  progress = null
+
+  league.hide()
+  showMatch(true)
 }
 
-const menu = new EncounterMenu(element('#encounter'), {
-  onAction: (action) => submitEncounterAction(state, action),
-  onDefend: (techniqueId) => submitDefence(state, techniqueId),
-  onCancel: () => cancelActionMenu(state),
-})
+/**
+ * Bank the finished match and hand the round back to the rest of the league.
+ *
+ * Recorded in the fixture's own orientation, not the engine's, so an away win
+ * is an away win in the table.
+ */
+function finishMatch(): void {
+  if (!state) return
 
-const summary = new MatchSummary(element('#summary'), () => {
-  state = newMatch()
+  const fixture = nextUserFixture(season)
+  if (fixture) {
+    const playedAtHome = fixture.home === season.userTeamId
+    const mine = state.teams.home.score
+    const theirs = state.teams.away.score
+    recordResult(
+      season,
+      fixture,
+      playedAtHome ? mine : theirs,
+      playedAtHome ? theirs : mine,
+    )
+    // The rest of the round catches up with the user.
+    simulateRound(season, fixture.round)
+  }
+
+  save()
+}
+
+function returnToLeague(): void {
+  state = null
+  sides = null
   progress = null
-})
+  showMatch(false)
+  league.show(season)
+}
+
+/** Show or hide everything that only makes sense during a match. */
+function showMatch(playing: boolean): void {
+  element('#game').hidden = !playing
+  element('#radar').hidden = !playing
+  element('#scoreboard').hidden = !playing
+  if (!playing) element('#banner').hidden = true
+  if (playing) scene.resize()
+}
+
+function save(): void {
+  slot.write(serialise(season, squad.all()))
+}
 
 const loop = createLoop({
-  update: (dt) => stepMatch(state, dt, input.read()),
+  update: (dt) => {
+    if (state) stepMatch(state, dt, input.read())
+  },
   render: (alpha) => {
+    if (!state || !sides) return
+
     scene.draw(state, alpha, TICK_SECONDS)
     radar.draw(state, alpha)
     scoreboard.update(state)
@@ -67,7 +168,10 @@ const loop = createLoop({
     summary.update(state, () => {
       // Banked exactly once: the summary asks for this only on the frame the
       // match ends, and the result is held until the next match replaces it.
-      progress ??= squad.applyMatch(state, { home: BESAID_AUROCHS, away: LUCA_GOERS })
+      if (!progress) {
+        progress = squad.applyMatch(state!, sides!)
+        finishMatch()
+      }
       return progress
     })
     overlay.update(loop.stats, state)
@@ -80,6 +184,7 @@ window.addEventListener('resize', () => {
 })
 window.addEventListener('keydown', (event) => {
   if (event.key === '~' || event.key === '`') overlay.toggle()
+  if (!state) return
 
   // Stop and look up. Space would otherwise scroll the page.
   if (event.key === ' ' || event.key === 'Enter') {
@@ -99,6 +204,7 @@ document.addEventListener('visibilitychange', () => {
   else loop.start()
 })
 
+returnToLeague()
 loop.start()
 
 // Dev-only console handle, for inspecting or driving a match from devtools.
@@ -108,6 +214,9 @@ if (import.meta.env.DEV) {
       get state() {
         return state
       },
+      get season() {
+        return season
+      },
       squad,
       loop,
       input,
@@ -115,6 +224,18 @@ if (import.meta.env.DEV) {
       radar,
       menu,
       summary,
+      league,
+      save,
+      newSeason: () => {
+        slot.clear()
+        season = createSeason(
+          TEAMS.map((team) => team.id),
+          MY_TEAM,
+          `blitzball-${Date.now()}`,
+        )
+        returnToLeague()
+      },
+      USER_TEAM,
       stepMatch,
       submitEncounterAction,
       submitDefence,

@@ -85,3 +85,21 @@ export function fixturesInRound(fixtures: readonly Fixture[], round: number): Fi
 export function involves(fixture: Fixture, teamId: string): boolean {
   return fixture.home === teamId || fixture.away === teamId
 }
+
+/**
+ * A fixture's identity, as a string.
+ *
+ * Fixtures are compared by what they are rather than by object identity, so a
+ * season restored from a save file — where every fixture is a freshly parsed
+ * object — still knows which of them have been played. Identity comparison
+ * worked right up until there was a save file, which is exactly the kind of bug
+ * that only shows up once someone reloads the page.
+ */
+export function fixtureKey(fixture: Fixture): string {
+  return `${fixture.round}:${fixture.home}-${fixture.away}`
+}
+
+/** Whether two fixtures are the same fixture. */
+export function sameFixture(a: Fixture, b: Fixture): boolean {
+  return fixtureKey(a) === fixtureKey(b)
+}

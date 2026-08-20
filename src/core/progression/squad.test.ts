@@ -24,7 +24,7 @@ const TICK = 1 / 60
 const TEAMS = { home: BESAID_AUROCHS, away: LUCA_GOERS } as const
 
 const newMatch = (squad?: Squad, seed = 'squad') =>
-  createMatch(BESAID_AUROCHS, LUCA_GOERS, seed, squad?.lookup)
+  createMatch(BESAID_AUROCHS, LUCA_GOERS, seed, squad?.lookupFor(TEAMS))
 
 /** Play a full match out with both sides on AI. */
 function playOut(state: MatchState): void {
@@ -108,7 +108,7 @@ describe('banking a match', () => {
 
     expect(progress).toHaveLength(1)
     expect(progress[0]!.name).toBe('Tidus')
-    expect(squad.career('home:tidus').exp).toBe(EXP_AWARDS.goal)
+    expect(squad.career('aurochs:tidus').exp).toBe(EXP_AWARDS.goal)
   })
 
   it('leaves out players who did nothing', () => {
@@ -129,15 +129,17 @@ describe('banking a match', () => {
     expect(squad.applyMatch(state, TEAMS)[0]!.name).toBe('Wakka')
   })
 
-  it('keeps the two sides apart even in a mirror fixture', () => {
+  it('keeps two teams apart, whichever end they line up at', () => {
     const squad = new Squad()
-    const state = createMatch(BESAID_AUROCHS, BESAID_AUROCHS, 'mirror', squad.lookup)
+    const teams = { home: LUCA_GOERS, away: BESAID_AUROCHS } as const
+    const state = createMatch(LUCA_GOERS, BESAID_AUROCHS, 'reversed', squad.lookupFor(teams))
 
-    awardExp(state, state.players.find((p) => p.id === 'home:tidus')!, 'goal')
-    squad.applyMatch(state, { home: BESAID_AUROCHS, away: BESAID_AUROCHS })
+    // The Aurochs are the away side today. Their careers are still theirs.
+    awardExp(state, state.players.find((p) => p.id === 'away:tidus')!, 'goal')
+    squad.applyMatch(state, teams)
 
-    expect(squad.career('home:tidus').exp).toBe(EXP_AWARDS.goal)
-    expect(squad.career('away:tidus').exp).toBe(0)
+    expect(squad.career('aurochs:tidus').exp).toBe(EXP_AWARDS.goal)
+    expect(squad.career('goers:bickson').exp).toBe(0)
   })
 })
 
@@ -147,7 +149,7 @@ describe('carrying progress into the next match', () => {
     const tidusDef = findPlayer(BESAID_AUROCHS, 'tidus')
 
     // Bank enough for several levels through the squad's own career object.
-    const career = squad.career('home:tidus')
+    const career = squad.career('aurochs:tidus')
     const first = newMatch(squad)
     const before = first.players.find((p) => p.id === 'home:tidus')!.stats
 
@@ -172,7 +174,7 @@ describe('carrying progress into the next match', () => {
 
   it('starts a levelled player on their improved HP', () => {
     const squad = new Squad()
-    const career = squad.career('home:wakka')
+    const career = squad.career('aurochs:wakka')
     career.level = 5
     career.gains = { ...career.gains, hp: 30 }
 
@@ -196,12 +198,12 @@ describe('carrying progress into the next match', () => {
     awardExp(state, state.players.find((p) => p.id === 'home:tidus')!, 'goal')
 
     squad.applyMatch(state, TEAMS)
-    const after = squad.career('home:tidus').exp
+    const after = squad.career('aurochs:tidus').exp
 
     // The caller is responsible for not re-banking; this documents that the
     // match state itself is not consumed, so a second call would double-count.
     squad.applyMatch(state, TEAMS)
-    expect(squad.career('home:tidus').exp).toBe(after + EXP_AWARDS.goal)
+    expect(squad.career('aurochs:tidus').exp).toBe(after + EXP_AWARDS.goal)
   })
 })
 

@@ -1,5 +1,5 @@
 import type { CareerProgress } from '../core/progression/career'
-import { USER_TEAM, type MatchState } from '../core/match/state'
+import type { MatchState } from '../core/match/state'
 import type { PlayerStats } from '../data/types'
 
 const STAT_LABELS: Record<keyof PlayerStats, string> = {
@@ -25,7 +25,9 @@ export class MatchSummary {
 
   constructor(
     private readonly element: HTMLElement,
-    private readonly onPlayAgain: () => void,
+    private readonly onDone: () => void,
+    /** Whose development is worth reporting: the side the user manages. */
+    private readonly userTeamId: () => string,
   ) {
     this.element.addEventListener('click', this.onClick)
   }
@@ -68,7 +70,7 @@ export class MatchSummary {
     table.className = 'sum-list'
 
     // Only the user's own players: another team's development is not their news.
-    const mine = progress.filter((p) => p.playerId.startsWith(`${USER_TEAM}:`))
+    const mine = progress.filter((p) => p.playerId.startsWith(`${this.userTeamId()}:`))
     if (mine.length === 0) {
       const empty = document.createElement('li')
       empty.className = 'sum-empty'
@@ -81,7 +83,7 @@ export class MatchSummary {
     const button = document.createElement('button')
     button.className = 'sum-again'
     button.dataset.action = 'play-again'
-    button.textContent = 'Next match'
+    button.textContent = 'Back to the league'
 
     this.element.replaceChildren(heading, verdict, table, button)
   }
@@ -119,7 +121,7 @@ export class MatchSummary {
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (target?.dataset.action !== 'play-again') return
     this.hide()
-    this.onPlayAgain()
+    this.onDone()
   }
 }
 
