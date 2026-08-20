@@ -216,6 +216,127 @@
         opacity: 0.45;
       }
 
+      /* League screen */
+      #league {
+        position: fixed;
+        inset: 0;
+        overflow-y: auto;
+        display: grid;
+        align-content: start;
+        justify-items: center;
+        gap: 4px;
+        padding: 40px 24px 64px;
+        background: radial-gradient(120% 90% at 50% 0%, #0b2a44 0%, #05080f 70%);
+      }
+      .lg-title {
+        margin: 0;
+        font: 700 34px/1.1 ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: 0.01em;
+      }
+      .lg-subtitle {
+        margin: 0 0 26px;
+        font-size: 14px;
+        opacity: 0.6;
+      }
+      .lg-table {
+        display: grid;
+        /* pos, team, P W D L, goals, GD, pts */
+        grid-template-columns: 28px minmax(150px, 1fr) repeat(4, 34px) 68px 46px 44px;
+        gap: 2px 8px;
+        width: min(640px, calc(100vw - 32px));
+        margin-bottom: 30px;
+        font: 14px ui-sans-serif, system-ui, sans-serif;
+      }
+      .lg-row {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        align-items: center;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: rgb(255 255 255 / 0.04);
+      }
+      .lg-row > span:not(.lg-team) {
+        text-align: right;
+        font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .lg-head {
+        background: none;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.45;
+      }
+      .lg-mine {
+        background: rgb(127 216 255 / 0.14);
+        outline: 1px solid var(--edge);
+      }
+      .lg-pos {
+        opacity: 0.5;
+      }
+      .lg-team {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 600;
+        text-align: left;
+      }
+      .lg-swatch {
+        flex: none;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+      .lg-points {
+        font-weight: 700;
+      }
+      .lg-fixtures {
+        width: min(640px, calc(100vw - 32px));
+        margin-bottom: 28px;
+      }
+      .lg-fixtures-title {
+        margin: 0 0 10px;
+        font: 11px ui-sans-serif, system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.45;
+      }
+      .lg-fixture {
+        display: grid;
+        grid-template-columns: 1fr 78px 1fr;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        margin-bottom: 4px;
+        border-radius: 8px;
+        background: rgb(255 255 255 / 0.04);
+        font-size: 14px;
+      }
+      .lg-home {
+        text-align: right;
+      }
+      .lg-score {
+        text-align: center;
+        font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+        opacity: 0.85;
+      }
+      .lg-play {
+        padding: 12px 28px;
+        border: 1px solid var(--edge);
+        border-radius: 9px;
+        background: rgb(127 216 255 / 0.14);
+        color: inherit;
+        font: 600 15px ui-sans-serif, system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .lg-play:hover:not(:disabled) {
+        background: rgb(127 216 255 / 0.26);
+      }
+      .lg-play:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
       /* Full-time summary */
       #summary {
         position: fixed;
@@ -304,6 +425,7 @@
     <pre id="debug"></pre>
     <div id="encounter" hidden></div>
     <div id="summary" hidden></div>
+    <div id="league" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

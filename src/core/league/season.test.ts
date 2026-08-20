@@ -83,8 +83,22 @@ describe('recording a result', () => {
 
   it('refuses a fixture that is not in this season', () => {
     const season = newSeason()
-    const stranger = { round: 1, home: 'aurochs', away: 'goers' }
-    expect(recordResult(season, stranger, 1, 0)).toBe(false)
+    expect(recordResult(season, { round: 1, home: 'aurochs', away: 'zanarkand' }, 1, 0)).toBe(false)
+    // Right teams, wrong round: still not a fixture anyone scheduled.
+    const real = season.fixtures[0]!
+    expect(recordResult(season, { ...real, round: 99 }, 1, 0)).toBe(false)
+    expect(season.results).toEqual([])
+  })
+
+  it('recognises a fixture by what it is, not by which object it is', () => {
+    // A season restored from a save file has freshly parsed fixtures. Comparing
+    // by identity worked right up until there was a save file.
+    const season = newSeason()
+    const fixture = nextUserFixture(season)!
+
+    expect(recordResult(season, { ...fixture }, 2, 0)).toBe(true)
+    expect(isPlayed(season, fixture)).toBe(true)
+    expect(nextUserFixture(season)).not.toEqual(fixture)
   })
 
   it('moves the user on to their next fixture', () => {

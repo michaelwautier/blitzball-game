@@ -1,5 +1,5 @@
 import { findTeam } from '../../data/teams'
-import { involves, roundRobin, roundsIn, type Fixture } from './fixtures'
+import { fixtureKey, involves, roundRobin, roundsIn, sameFixture, type Fixture } from './fixtures'
 import { simulateMatch } from './simulate'
 import { standings, type MatchResult, type TableRow } from './standings'
 import type { CareerLookup } from '../match/state'
@@ -54,7 +54,7 @@ export function totalRounds(season: Season): number {
 
 /** Whether this fixture has already been played. */
 export function isPlayed(season: Season, fixture: Fixture): boolean {
-  return season.results.some((result) => result.fixture === fixture)
+  return season.results.some((result) => sameFixture(result.fixture, fixture))
 }
 
 /**
@@ -99,7 +99,7 @@ export function recordResult(
   away: number,
 ): boolean {
   if (isPlayed(season, fixture)) return false
-  if (!season.fixtures.includes(fixture)) return false
+  if (!season.fixtures.some((scheduled) => sameFixture(scheduled, fixture))) return false
 
   season.results.push({ fixture, home, away })
   return true
@@ -150,5 +150,5 @@ export function simulateRestOfSeason(season: Season, careers?: CareerLookup): nu
 
 /** A fixture's own seed: stable regardless of when it is resolved. */
 export function fixtureSeed(season: Season, fixture: Fixture): string {
-  return `${season.seed}:${fixture.round}:${fixture.home}-${fixture.away}`
+  return `${season.seed}:${fixtureKey(fixture)}`
 }
