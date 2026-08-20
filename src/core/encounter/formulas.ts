@@ -48,6 +48,67 @@ export function rollStat(stat: number, rng: Rng): number {
   return Math.max(0, Math.round(stat * rng.range(ROLL_MIN, ROLL_MAX)))
 }
 
+/**
+ * A keeper's catch swings far wider than any other roll.
+ *
+ * Every other contest in the game is many-against-one and repeated dozens of
+ * times a match, so a narrow band averages out into something that reads as
+ * skill. A save is neither: it happens a handful of times, once, alone, and it
+ * decides the scoreline outright.
+ *
+ * At the ordinary 50–150% band it decided rather more than that. A shot reaches
+ * goal with single digits of power left, so the outcome came down to the ratio
+ * of two small numbers — and across the six real squads the keepers' catch
+ * stats sit at 5, 6, 8, 9, 9 and 18. Those four points between Keepa and Raudy
+ * were the difference between conceding fifteen a match and never conceding at
+ * all: four of the six sides went a whole season without letting one in, and the
+ * Aurochs shipped over a thousand. Widening the band restores the gradient the
+ * catch stat is supposed to describe, so a good keeper is beaten now and again
+ * and a poor one still pulls one out.
+ *
+ * It is also the honest picture of the act. A keeper facing a ball flung at a
+ * corner of an open ring either reads it or is wrong-footed, and that is a
+ * bigger swing than leaning into a tackle.
+ */
+export const CATCH_ROLL_MIN = 0.2
+export const CATCH_ROLL_MAX = 2
+
+/**
+ * What a keeper brings before the roll: a floor, plus their catch stat.
+ *
+ * Anyone standing in front of the ring stops some of what comes at it. CA says
+ * how much better than that they are, not whether they are a goalkeeper at all —
+ * and taken as the whole story it made the six squads' keepers incomparable
+ * rather than merely unequal. Their stats are 5, 6, 8, 9, 9 and 18; used raw
+ * that is a factor of nearly four on the one number a scoreline turns on, so
+ * Keepa conceded almost everything and Nimrook conceded nothing. The floor
+ * compresses the same ordering into something a match can be played against:
+ * Keepa reaches 7 against Nimrook's 14.8, still a gulf, no longer a verdict.
+ */
+export const CATCH_FLOOR = 4
+export const CATCH_PER_POINT = 0.6
+
+/** A keeper's catch before the roll, floor included. */
+export function catchStrength(stat: number): number {
+  return CATCH_FLOOR + Math.max(0, stat) * CATCH_PER_POINT
+}
+
+/** Roll a keeper's catch against an arriving shot. See the band above. */
+export function rollCatch(stat: number, rng: Rng): number {
+  return Math.max(0, Math.round(catchStrength(stat) * rng.range(CATCH_ROLL_MIN, CATCH_ROLL_MAX)))
+}
+
+/**
+ * The catch a shooter should expect to have to beat: the middle of the band.
+ *
+ * What the AI judges a shot against. It is not `stat` itself — the band is not
+ * centred on 1 — and using the stat directly made shooters respect good keepers
+ * so much that they declined to shoot at all, for entire matches.
+ */
+export function expectedCatch(stat: number): number {
+  return catchStrength(stat) * ((CATCH_ROLL_MIN + CATCH_ROLL_MAX) / 2)
+}
+
 /** The least and most a stat can roll, matching `rollStat`'s bounds exactly. */
 export function rollBounds(stat: number): { min: number; max: number } {
   if (stat <= 0) return { min: 0, max: 0 }

@@ -40,6 +40,24 @@ export const CHASERS = 3
  */
 const MARKING_DISTANCE = PLAYER_RADIUS * 2
 
+/**
+ * How far apart the closing defenders fan out from one another.
+ *
+ * Wide enough that the third of them sits outside `ENGAGE_RADIUS`: two press the
+ * ball and the spare covers the pass, rather than all three arriving on top of
+ * the carrier at once.
+ *
+ * This is the number that decides whether an attack can go anywhere. Blocking is
+ * summed across everyone engaged, so a third body on the carrier adds another
+ * whole BL roll to every throw — and at level one, where a shooter carries SH 9
+ * to 13 and defenders block at 8 to 14, that third roll is the difference
+ * between a shot the keeper has to deal with and one that never leaves. With all
+ * three engaged, four fifths of every shot in the game was blocked at the
+ * encounter, and the only sides who conceded were the two whose defenders block
+ * at 5 and 2.
+ */
+const MARKING_FAN = PLAYER_RADIUS * 3
+
 export function steerByRole(state: MatchState, player: Player, dt: number): void {
   steerTowards(player, desiredPosition(state, player), speedOf(player, state), dt)
 }
@@ -101,7 +119,7 @@ function markingSpot(state: MatchState, carrier: Player, rank: number): Vec2 {
   return clampToPool(
     {
       x: carrier.x + forward * MARKING_DISTANCE,
-      y: carrier.y + away * rank * MARKING_DISTANCE,
+      y: carrier.y + away * rank * MARKING_FAN,
     },
     PLAYER_RADIUS,
   )

@@ -51,7 +51,7 @@ export const RESULT_SECONDS = 1.1
  * global hold was a blunt instrument, freezing defenders who had nothing to do
  * with the challenge.
  */
-export const BREAKTHROUGH_GRACE = 0.8
+export const BREAKTHROUGH_GRACE = 2
 
 /**
  * Seconds a beaten defender spends out of the play.
@@ -63,9 +63,31 @@ export const BREAKTHROUGH_GRACE = 0.8
 export const BREAKTHROUGH_RECOVERY = 1.6
 
 /** Seconds before the next encounter after any other outcome. */
-export const RESUME_GRACE = 1.5
+export const RESUME_GRACE = 4
 
-/** Opponents currently close enough to engage this carrier. */
+/**
+ * How many opponents can be on the carrier at once.
+ *
+ * Two. A third body in the water is covering the pass, not the ball, however
+ * close it happens to be — and the distinction decides whether the game has any
+ * attacking play in it at all.
+ *
+ * Blocking and tackling are both summed across everyone engaged, so each extra
+ * defender adds a whole roll to every route out. At level one a carrier brings
+ * SH 9–13 and EN 2–20 against defenders who block at 8–14 and tackle at 8–12.
+ * Two of those is a hard contest. Three is arithmetic: the throw cannot survive
+ * the blocking, the breakthrough cannot survive the tackling, and the only sides
+ * conceding goals were the two whose defenders block at 5 and 2. Four fifths of
+ * every shot in the game was blocked before it left, and four of the six squads
+ * went a full season without letting one in.
+ *
+ * Capping here rather than by keeping the third defender further away, which was
+ * tried first and does nothing: a defender heading for a covering position is
+ * still swimming past the carrier to reach it.
+ */
+export const MAX_ENGAGED = 2
+
+/** Opponents currently close enough to engage this carrier, closest first. */
 export function engagingDefenders(state: MatchState, carrier: Player): Player[] {
   return state.players
     .filter(
@@ -77,6 +99,7 @@ export function engagingDefenders(state: MatchState, carrier: Player): Player[] 
         distanceBetween(p, carrier) <= ENGAGE_RADIUS,
     )
     .sort((a, b) => distanceBetween(a, carrier) - distanceBetween(b, carrier))
+    .slice(0, MAX_ENGAGED)
 }
 
 /**
@@ -139,22 +162,31 @@ export function tackleRange(defenders: readonly EncounterDefender[]): {
   return totalRange(defenders.map((d) => d.attack))
 }
 
-/** The same, for the blocking a pass or shot has to survive. */
+/**
+ * The same, for the blocking a pass or shot has to survive.
+ *
+ * Weighted exactly as `contestThrow` weights it, so the odds the menu shows and
+ * the odds the AI reasons about are the odds that actually get rolled.
+ */
 export function blockRange(defenders: readonly EncounterDefender[]): {
   min: number
   max: number
 } {
-  return totalRange(defenders.map((d) => d.block))
+  return totalRange(defenders.map((d) => d.block), coverageOf)
 }
 
-function totalRange(stats: readonly number[]): { min: number; max: number } {
+function totalRange(
+  stats: readonly number[],
+  weightOf: (index: number) => number = () => 1,
+): { min: number; max: number } {
   let min = 0
   let max = 0
-  for (const stat of stats) {
+  stats.forEach((stat, index) => {
     const bounds = rollBounds(stat)
-    min += bounds.min
-    max += bounds.max
-  }
+    const weight = weightOf(index)
+    min += Math.round(bounds.min * weight)
+    max += Math.round(bounds.max * weight)
+  })
   return { min, max }
 }
 
@@ -441,6 +473,27 @@ export function defensiveTechniques(state: MatchState, encounter: Encounter): Te
  * stopping on the ball in space is worth so much — with nobody engaged there is
  * nothing to subtract, and the throw faces only the distance.
  */
+/**
+ * How much of their blocking each defender actually brings, by closeness.
+ *
+ * The nearest defender is in the throwing lane and blocks with everything they
+ * have. The next is behind their shoulder, covering ground the first already
+ * covers, and contributes half.
+ *
+ * Tackling still sums in full — two players can both get hands on a carrier —
+ * but two bodies do not block twice as much of an open ring, and treating them
+ * as though they did is what made throwing impossible at level one. A shooter
+ * carries SH 9 to 13; the Guado block at 14, 10, 7, 7 and 6, so any two of them
+ * summed outright exceeded every shot in the game before it was thrown. They
+ * went whole seasons without conceding or scoring.
+ */
+const NEAREST_BLOCKER_COVERAGE = 1
+const SECOND_BLOCKER_COVERAGE = 0.5
+
+function coverageOf(index: number): number {
+  return index === 0 ? NEAREST_BLOCKER_COVERAGE : SECOND_BLOCKER_COVERAGE
+}
+
 function contestThrow(
   state: MatchState,
   defenders: readonly EncounterDefender[],
@@ -449,11 +502,14 @@ function contestThrow(
   const rolls: number[] = []
   let remaining = power
 
+  let index = 0
   for (const engaged of defenders) {
     const defender = playerById(state, engaged.id)
     if (!defender) continue
 
-    const block = rollStat(effectiveStat(defender, 'bl'), state.rng)
+    const block = Math.round(
+      rollStat(effectiveStat(defender, 'bl'), state.rng) * coverageOf(index++),
+    )
     remaining -= block
     rolls.push(block)
 

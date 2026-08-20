@@ -127,24 +127,27 @@ describe('match balance', () => {
   })
 
   /**
-   * The Aurochs do not currently win, and this deliberately does not pretend
-   * otherwise.
+   * The Aurochs still lose this one, and should.
    *
-   * On FFX's real level-one tables they are outclassed in exactly the places
-   * that decide matches: Keepa catches at 5 against Raudy's 8, and their
-   * outfielders block at 2 where the Goers' block at 8. That is faithful — the
-   * Aurochs are the joke of the league in the story — but it makes the exhibition
-   * match unwinnable for the side the user plays, which is a design decision
-   * still to be taken rather than something to tune away here.
+   * On FFX's real level-one tables they are outclassed exactly where matches are
+   * decided: Keepa catches at 5 against Raudy's 8, and their outfielders block at
+   * 2 where the Goers block at 8. That is faithful — they are the joke of the
+   * league in the story — and the fixture below is the one they are meant to be
+   * hammered in.
    *
-   * What must stay true is that they are competitive enough to score.
+   * What must stay true is that they turn up: they score, and the scoreline is a
+   * beating rather than an erasure. Whether they can *win* is asked of the sides
+   * they are supposed to be able to beat, in `the rest of the league` below.
    */
-  it('lets the underdog score at all against the best side in the game', () => {
-    // Only that they are not shut out entirely across a run. How often a team
-    // scores is a question about a fair fixture, and is asked of the mirror
-    // matches below; asking it of this one measures the gulf between these two
-    // squads, which is a gulf the source data puts there deliberately.
-    expect(total((r) => r.home)).toBeGreaterThan(0)
+  it('lets the underdog score against the best side in the game', () => {
+    expect(total((r) => r.home), 'the Aurochs never scored').toBeGreaterThan(0)
+  })
+
+  it('keeps even the heaviest defeat to a believable scoreline', () => {
+    // Fifteen a match was the old reality, from a keeper's catch stat deciding
+    // the fixture outright before anything was thrown.
+    const conceded = total((r) => r.away) / reports.length
+    expect(conceded, `conceded ${conceded.toFixed(1)} a match`).toBeLessThan(12)
   })
 
   it('is reproducible: the same seed replays the same scoreline', () => {
@@ -169,6 +172,24 @@ describe('the rest of the league', () => {
       expect(report.encounters, 'the two sides never met').toBeGreaterThan(5)
     },
   )
+
+  /**
+   * The Aurochs can win a match, against the side they ought to beat.
+   *
+   * This is the whole reason the other four teams exist, and it is the assertion
+   * that would have failed loudest before the scoring rework: across every one of
+   * the thirty pairings in the league, the Aurochs previously won nothing, drew
+   * only with Kilika, and conceded over a thousand goals in a hundred matches.
+   * Four of the six sides went a full season without letting one in.
+   */
+  it('lets the Aurochs beat the side they are level with', () => {
+    const kilika = TEAMS.find((team) => team.id === 'beasts')!
+    const results = Array.from({ length: 8 }, (_, i) =>
+      simulateMatch(`beatable-${i}`, BESAID_AUROCHS, kilika),
+    )
+    const wins = results.filter((r) => r.home > r.away).length
+    expect(wins, `won ${wins} of ${results.length} against Kilika`).toBeGreaterThan(0)
+  })
 })
 
 describe('side fairness', () => {

@@ -16,7 +16,7 @@ export const PICKUP_COOLDOWN = 0.4
  * tick — the tackler is by definition surrounded — and possession ping-pongs
  * with no play in between.
  */
-export const POSSESSION_GRACE = 1.5
+export const POSSESSION_GRACE = 4
 
 /**
  * Hand the ball to a player and refresh the possession's endurance.
