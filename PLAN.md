@@ -184,6 +184,31 @@ against the ladder alone.
    `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
    challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
    what #24 spent its effort on.
+8. **A throw flies to where it was aimed.** Two faults, one subject. Power is currently
+   drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
+   and is collected by `nearestOpponent` — nearest to the **ball**, which is a defender
+   standing on the trajectory. That reads as an interception by someone who, by design, is not
+   allowed to intercept: only the defenders who engaged the carrier contest a throw, and they
+   did so at the encounter. It also contradicts this file, which already says the *receiver*
+   fumbles it. So: a throw always travels to its target, decay is settled on arrival, and a
+   throw that arrives spent is fumbled there — after which the ball visibly travels on to
+   whoever collects it, rather than teleporting. Second fault: the `flight` phase runs
+   `movePlayers`, so everyone swims while the ball is in the air. FFX holds them still; the
+   clock keeps running. `FLIGHT_SPEED` comes down so all of this is legible rather than
+   instantaneous. Ladder-measured — freezing removes the defensive drift that currently
+   happens during every single pass.
+9. **A bigger pool and a closer camera.** Two constants, but not a free change:
+   `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
+   most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
+   goals a match rather than accepting whatever falls out.
+10. **Team strategies.** The first genuinely tactical decision the user gets. Each side plays a
+    defensive shape with real trade-offs — pressing commits everyone to the carrier and leaves
+    the passing lanes open; zone holds shape and concedes the carrier room; man-marking sits
+    between — and can switch mid-match to answer what the other side is doing. Mechanically
+    this is `CHASERS` and `markingSpot` in `positioning.ts` becoming strategy-driven rather
+    than constant. Each team gets a default that suits its squad: the Guado's blocking suits a
+    zone, the Ronso's attack suits pressing. Needs a ladder pass *per strategy* to show each is
+    viable rather than one being strictly best, which is the whole point of having them.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
