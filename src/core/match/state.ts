@@ -8,6 +8,7 @@ import {
   engagingDefenders,
   openDistribution,
   openEncounter,
+  openOnTheBall,
   resolveEncounter,
 } from '../encounter/encounter'
 import { kickoffPosition } from './formation'
@@ -311,6 +312,41 @@ function stepEncounter(state: MatchState, dt: number, encounter: Encounter): voi
   if (encounter.thinkTimer > 0) return
 
   applyEncounterAction(state, encounter, chooseEncounterAction(state, encounter))
+}
+
+/**
+ * Stop and look up: open the action menu on the user's carrier by choice.
+ *
+ * In the original you are never forced to wait for a defender before passing or
+ * shooting, and the same applies here. Refused unless the user's side is
+ * actually in open play with the ball, so it cannot be used to freeze the match
+ * at an arbitrary moment.
+ *
+ * Keepers are excluded because they get their own distribution decision the
+ * instant they claim the ball; there is nothing extra to request.
+ */
+export function requestActionMenu(state: MatchState): boolean {
+  if (state.phase.kind !== 'play') return false
+
+  const carrier = carrierOf(state)
+  if (!carrier || carrier.team !== USER_TEAM || carrier.slot === 'GK') return false
+
+  state.phase = { kind: 'encounter', encounter: openOnTheBall(state, carrier) }
+  return true
+}
+
+/**
+ * Back out of a decision the user opened themselves.
+ *
+ * Only legal for `onTheBall`: once defenders have committed, or a keeper has the
+ * ball, there is no declining to decide.
+ */
+export function cancelActionMenu(state: MatchState): boolean {
+  if (state.phase.kind !== 'encounter') return false
+  if (state.phase.encounter.kind !== 'onTheBall') return false
+
+  state.phase = { kind: 'play' }
+  return true
 }
 
 /**

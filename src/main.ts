@@ -1,5 +1,11 @@
 import { createLoop } from './core/loop'
-import { createMatch, stepMatch, submitEncounterAction } from './core/match/state'
+import {
+  cancelActionMenu,
+  createMatch,
+  requestActionMenu,
+  stepMatch,
+  submitEncounterAction,
+} from './core/match/state'
 import { BESAID_AUROCHS, LUCA_GOERS } from './data/teams'
 import { KeyboardInput } from './input/keyboard'
 import { Renderer } from './render/renderer'
@@ -17,7 +23,10 @@ const renderer = new Renderer(canvas)
 const overlay = new DebugOverlay(debugElement)
 const input = new KeyboardInput()
 const state = createMatch(BESAID_AUROCHS, LUCA_GOERS, `blitzball-${Date.now()}`)
-const menu = new EncounterMenu(encounterElement, (action) => submitEncounterAction(state, action))
+const menu = new EncounterMenu(encounterElement, {
+  onAction: (action) => submitEncounterAction(state, action),
+  onCancel: () => cancelActionMenu(state),
+})
 
 const loop = createLoop({
   update: (dt) => stepMatch(state, dt, input.read()),
@@ -31,6 +40,11 @@ const loop = createLoop({
 window.addEventListener('resize', () => renderer.resize())
 window.addEventListener('keydown', (event) => {
   if (event.key === '~' || event.key === '`') overlay.toggle()
+
+  // Stop and look up. Space would otherwise scroll the page.
+  if (event.key === ' ' || event.key === 'Enter') {
+    if (requestActionMenu(state)) event.preventDefault()
+  }
 })
 
 // A backgrounded tab stops firing rAF; restart cleanly instead of accumulating time.
@@ -46,6 +60,16 @@ loop.start()
 //   blitzball.renderer.draw(blitzball.state, 0)
 if (import.meta.env.DEV) {
   Object.assign(window, {
-    blitzball: { state, loop, input, renderer, menu, stepMatch, submitEncounterAction },
+    blitzball: {
+      state,
+      loop,
+      input,
+      renderer,
+      menu,
+      stepMatch,
+      submitEncounterAction,
+      requestActionMenu,
+      cancelActionMenu,
+    },
   })
 }
