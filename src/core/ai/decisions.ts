@@ -1,5 +1,5 @@
 import { GOAL_HALF_HEIGHT, POOL_RADIUS, goalLineX } from '../pitch'
-import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
+import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT, rollBounds } from '../encounter/formulas'
 import { ENGAGE_RADIUS, blockRange, tackleRange } from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
 import {
@@ -74,14 +74,23 @@ export function chooseEncounterAction(
     encounter.kind === 'contested' && encounter.endurance - expected > BREAKTHROUGH_MARGIN
 
   if (isShotWorthTaking(state, carrier, goalDistance, encounter)) {
-    return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
+    return {
+      kind: 'shoot',
+      techniqueId: chooseTechnique(carrier, 'shoot'),
+      breakPast: chooseBreakPast(encounter, carrier, 'sh'),
+    }
   }
 
   if (canBreakThrough) return { kind: 'breakthrough' }
 
   const receiver = bestPassTarget(state, carrier)
   if (receiver) {
-    return { kind: 'pass', targetId: receiver.id, techniqueId: chooseTechnique(carrier, 'pass') }
+    return {
+      kind: 'pass',
+      targetId: receiver.id,
+      techniqueId: chooseTechnique(carrier, 'pass'),
+      breakPast: chooseBreakPast(encounter, carrier, 'pa'),
+    }
   }
 
   // Cornered: no shot on, not enough endurance, nobody to find. A speculative
@@ -90,7 +99,11 @@ export function chooseEncounterAction(
   // whose best shooter cannot clear the opposing keeper's catching never shoots
   // at all, at any range, for the entire match.
   if (goalDistance <= DESPERATION_RANGE || encounter.kind !== 'contested') {
-    return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
+    return {
+      kind: 'shoot',
+      techniqueId: chooseTechnique(carrier, 'shoot'),
+      breakPast: chooseBreakPast(encounter, carrier, 'sh'),
+    }
   }
 
   return { kind: 'breakthrough' }
@@ -261,6 +274,8 @@ export function chooseDistribution(state: MatchState, keeper: Player): Encounter
     kind: 'pass',
     targetId: receiver?.id ?? '',
     techniqueId: receiver ? chooseTechnique(keeper, 'pass') : null,
+    // A keeper has nobody on them; there is nothing to clear.
+    breakPast: 0,
   }
 }
 
@@ -281,4 +296,45 @@ export function shouldStopAndShoot(state: MatchState, carrier: Player): boolean 
   // Otherwise only pull the trigger on a chance actually worth taking, rather
   // than letting fly the instant the goal comes into range.
   return isShotWorthTaking(state, carrier, goalDistance)
+}
+
+/**
+ * How many defenders to clear before throwing.
+ *
+ * The trade FFX offers: endurance spent getting past someone is blocking that
+ * never gets counted against the pass or shot. Worth taking when the throw would
+ * not survive the crowd otherwise, and not worth it when it would — clearing a
+ * defender you did not need to costs endurance that the next challenge will
+ * want, and risks losing the ball outright on the way.
+ */
+export function chooseBreakPast(
+  encounter: Encounter,
+  carrier: Player,
+  stat: 'pa' | 'sh',
+): number {
+  const defenders = encounter.defenders
+  if (defenders.length === 0) return 0
+
+  const power = effectiveStat(carrier, stat)
+  const expected = (range: { min: number; max: number }) => (range.min + range.max) / 2
+
+  let endurance = encounter.endurance
+  // Judged against the middle of the range rather than the worst case: waiting
+  // for a guarantee means never clearing anyone, since a low-level passer cannot
+  // beat two defenders' blocking outright however much endurance they spend.
+  if (power > expected(blockRange(defenders))) return 0
+
+  for (let count = 1; count <= defenders.length; count++) {
+    const next = defenders[count - 1]!
+    // Never take on a challenge that could take the ball outright: losing it
+    // here means the throw never happens at all.
+    const tackle = rollBounds(next.attack)
+    if (endurance - tackle.max <= 0) break
+
+    endurance -= tackle.max
+    if (power > expected(blockRange(defenders.slice(count)))) return count
+  }
+
+  // Cannot clear enough to make the throw worth more; keep the endurance.
+  return 0
 }

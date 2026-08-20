@@ -322,6 +322,126 @@ describe('breakthrough', () => {
   })
 })
 
+describe('clearing defenders before a throw', () => {
+  it('takes nobody on when asked for none', () => {
+    const state = newMatch('clear-none')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+
+    const result = resolveEncounter(state, encounter, {
+      kind: 'pass',
+      targetId: 'home:tidus',
+      techniqueId: null,
+      breakPast: 0,
+    })
+
+    // No challenge happened, so no endurance arithmetic appears and nobody was
+    // carried past. Checking the summary rather than the endurance figure, which
+    // is reset by whoever ends up with the ball.
+    expect(result.summary).not.toContain('EN ')
+    for (const defender of engaged) expect(defender.lunge).toBeNull()
+  })
+
+  it('spends endurance on the ones it does take on', () => {
+    const state = newMatch('clear-one')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 200
+    state.endurance = 200
+
+    const result = resolveEncounter(state, encounter, {
+      kind: 'pass',
+      targetId: 'home:tidus',
+      techniqueId: null,
+      breakPast: 1,
+    })
+
+    // One challenge, reported with its arithmetic, and the drain lands inside
+    // the range that defender could have rolled.
+    const spent = result.summary.match(/^EN 200 − (\d+) =/)
+    expect(spent, result.summary).not.toBeNull()
+
+    const { min, max } = tackleRange(encounter.defenders.slice(0, 1))
+    expect(Number(spent![1])).toBeGreaterThanOrEqual(min)
+    expect(Number(spent![1])).toBeLessThanOrEqual(max)
+  })
+
+  it('leaves a throw facing only the defenders still standing', () => {
+    const state = newMatch('clear-all')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 300
+    state.endurance = 300
+
+    // Everyone cleared, so nothing is left to cut the ball out and it flies
+    // regardless of how weak the pass would otherwise have been.
+    const result = resolveEncounter(state, encounter, {
+      kind: 'pass',
+      targetId: 'home:tidus',
+      techniqueId: null,
+      breakPast: engaged.length,
+    })
+
+    expect(result.success).toBe(true)
+    expect(state.phase.kind).toBe('flight')
+  })
+
+  it('carries the cleared defenders past, as a breakthrough does', () => {
+    const state = newMatch('clear-lunge')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 300
+    state.endurance = 300
+
+    resolveEncounter(state, encounter, {
+      kind: 'shoot',
+      techniqueId: null,
+      breakPast: 1,
+    })
+
+    expect(engaged[0]!.lunge).not.toBeNull()
+    expect(engaged[0]!.recovery).toBeGreaterThan(0)
+    // The one that was not taken on is untouched.
+    expect(engaged[1]!.lunge).toBeNull()
+  })
+
+  it('never makes the throw if the ball is lost on the way', () => {
+    const state = newMatch('clear-fail')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 1
+    state.endurance = 1
+
+    const result = resolveEncounter(state, encounter, {
+      kind: 'shoot',
+      techniqueId: null,
+      breakPast: 2,
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.summary).toContain('tackled by')
+    expect(state.phase.kind).not.toBe('flight')
+    // The ball is with a defender, not in the air.
+    const holder = state.players.find((p) => p.id === state.ball.carrier)
+    expect(holder?.team).toBe('away')
+  })
+
+  it('ignores a count beyond the defenders actually there', () => {
+    const state = newMatch('clear-too-many')
+    const carrier = setUpEncounter(state, 'home:wakka', 1)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 300
+    state.endurance = 300
+
+    expect(() =>
+      resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null, breakPast: 9 }),
+    ).not.toThrow()
+  })
+})
+
 describe('pass and shoot', () => {
   it('sends the ball into flight towards the chosen teammate', () => {
     const state = newMatch()
@@ -329,7 +449,7 @@ describe('pass and shoot', () => {
     // Nobody engaged, so nothing subtracts from the throw and it definitely flies.
     const encounter = openEncounter(state, carrier, [])
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null, breakPast: 0 })
 
     expect(result.success).toBe(true)
     expect(state.ball.carrier).toBeNull()
@@ -345,7 +465,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:tidus', 0)
     const encounter = openEncounter(state, carrier, [])
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null, breakPast: 0 })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(carrier.id)
@@ -357,7 +477,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:wakka', 0)
     const encounter = openEncounter(state, carrier, [])
 
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null, breakPast: 0 })
 
     expect(state.phase.kind).toBe('flight')
     if (state.phase.kind === 'flight') {

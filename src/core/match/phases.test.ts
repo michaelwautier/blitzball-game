@@ -258,7 +258,7 @@ describe('ball in flight', () => {
 describe('encounter input', () => {
   it('ignores an action when no encounter is open', () => {
     const state = newMatch('no-enc')
-    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null })).toBe(false)
+    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null, breakPast: 0 })).toBe(false)
   })
 
   it('ignores an action aimed at the opponent s encounter', () => {
@@ -275,7 +275,7 @@ describe('encounter input', () => {
         thinkTimer: 5,
       },
     }
-    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null })).toBe(false)
+    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null, breakPast: 0 })).toBe(false)
   })
 
   it('accepts an action on the user s own encounter', () => {

@@ -48,7 +48,11 @@ function find(state: MatchState, id: string): Player {
 }
 
 /** A match with `carrierId` on the ball and a decision of `kind` open. */
-function openMenu(kind: Encounter['kind'], carrierId = 'home:wakka'): MatchState {
+function openMenu(
+  kind: Encounter['kind'],
+  carrierId = 'home:wakka',
+  endurance = 14,
+): MatchState {
   const state = createMatch(BESAID_AUROCHS, LUCA_GOERS, 'menu')
   const carrier = find(state, carrierId)
   giveBallTo(state, carrier)
@@ -58,7 +62,7 @@ function openMenu(kind: Encounter['kind'], carrierId = 'home:wakka'): MatchState
 
   state.phase = {
     kind: 'encounter',
-    encounter: { kind, carrierId, defenders, endurance: 14, thinkTimer: 0 },
+    encounter: { kind, carrierId, defenders, endurance, thinkTimer: 0 },
   }
   current = state
   menu.update(state)
@@ -226,10 +230,47 @@ describe('the pass target list', () => {
   })
 })
 
+describe('choosing how many to get past', () => {
+  it('offers every count from nobody up to all of them', () => {
+    openMenu('contested')
+    press('3')
+    // One defender in the fixture, so: throw through them, or get past them.
+    expect(labels()).toEqual(['Throw through them', 'Get past 1'])
+  })
+
+  it('shows what clearing them costs and what it buys', () => {
+    openMenu('contested')
+    press('3')
+
+    const through = details()[0]!
+    const past = details()[1]!
+    // Throwing through faces their blocking; getting past costs endurance and
+    // leaves nothing in the way.
+    expect(through).toMatch(/BL \d+–\d+/)
+    expect(through).not.toContain('EN')
+    expect(past).toContain('costs EN')
+    expect(past).toContain('BL 0–0')
+  })
+
+  it('will not offer a challenge the carrier cannot survive', () => {
+    // Endurance below even the best case of the tackle waiting for them.
+    openMenu('contested', 'home:wakka', 2)
+    press('3')
+    expect(buttons()[1]!.disabled).toBe(true)
+  })
+
+  it('offers it when there is endurance to spare', () => {
+    openMenu('contested', 'home:wakka', 40)
+    press('3')
+    expect(buttons()[1]!.disabled).toBe(false)
+  })
+})
+
 describe('the technique step', () => {
   it('lists the plain action first, then what the player knows', () => {
     openMenu('contested')
     press('3')
+    press('1')
     // Wakka knows Venom Shot.
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
   })
@@ -237,6 +278,7 @@ describe('the technique step', () => {
   it('prices each option in HP', () => {
     openMenu('contested')
     press('3')
+    press('1')
     const venom = findTechnique('venom-shot')
     expect(details()[0]).toContain(`${ACTION_HP_COST.shoot} HP`)
     expect(details()[1]).toContain(`${ACTION_HP_COST.shoot + venom.hpCost} HP`)
@@ -246,14 +288,26 @@ describe('the technique step', () => {
     openMenu('contested')
     press('3')
     press('1')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
+    press('1')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 0 })
+  })
+
+  it('carries the chosen count through to the action', () => {
+    // Enough endurance that taking the defender on is actually on offer.
+    openMenu('contested', 'home:wakka', 40)
+    press('3')
+    // Get past the one defender, then shoot plainly.
+    press('2')
+    press('1')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 1 })
   })
 
   it('commits the technique', () => {
     openMenu('contested')
     press('3')
+    press('1')
     press('2')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot' })
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot', breakPast: 0 })
   })
 
   it('disables a technique the carrier cannot pay for', () => {
@@ -262,6 +316,7 @@ describe('the technique step', () => {
     menu.update(state)
 
     press('3')
+    press('1')
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
     expect(buttons()[1]!.disabled).toBe(true)
 
@@ -273,12 +328,14 @@ describe('the technique step', () => {
     // Letty knows only a tackle technique, so shooting has nothing to offer.
     openMenu('contested', 'home:letty')
     press('3')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
+    press('1')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 0 })
   })
 
   it('passes straight through for a player with no pass techniques', () => {
     openMenu('contested', 'home:letty')
     press('2')
+    press('1')
     press('1')
 
     expect(onAction).toHaveBeenCalledTimes(1)
@@ -296,6 +353,8 @@ describe('remembering the pass target', () => {
     // still goes to that player rather than whoever the rows were rebuilt with.
     const chosen = labels()[2]
     press('3')
+    // Then how many to get past, then the technique.
+    press('1')
     press('1')
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
@@ -311,6 +370,7 @@ describe('remembering the pass target', () => {
     press('2')
     const chosen = labels()[1]
     press('2')
+    press('1')
     press('2')
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
@@ -323,15 +383,23 @@ describe('remembering the pass target', () => {
 })
 
 describe('going back', () => {
-  it('steps from the technique list back to the targets', () => {
+  it('steps back through each question in turn', () => {
     openMenu('contested')
     press('2')
+    press('1')
+    expect(labels()).toContain('Throw through them')
+
     press('1')
     expect(labels()).toContain('Straight pass')
 
     press('Escape')
-    expect(labels()).not.toContain('Straight pass')
+    expect(labels()).toContain('Throw through them')
+
+    press('Escape')
     expect(labels()).toContain('Tidus')
+
+    press('Escape')
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
   })
 
   it('steps from the targets back to the actions', () => {

@@ -167,7 +167,7 @@ describe('acting from an on-the-ball decision', () => {
     inTheClear(state)
     requestActionMenu(state)
 
-    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null })).toBe(true)
+    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null, breakPast: 0 })).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })
 
@@ -177,11 +177,7 @@ describe('acting from an on-the-ball decision', () => {
     requestActionMenu(state)
 
     expect(
-      submitEncounterAction(state, {
-        kind: 'pass',
-        targetId: 'home:wakka',
-        techniqueId: null,
-      }),
+      submitEncounterAction(state, { kind: 'pass', targetId: 'home:wakka', techniqueId: null, breakPast: 0 }),
     ).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })

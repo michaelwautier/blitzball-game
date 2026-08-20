@@ -78,8 +78,18 @@ export interface TeamState {
  */
 export type EncounterAction =
   | { kind: 'breakthrough' }
-  | { kind: 'pass'; targetId: string; techniqueId: string | null }
-  | { kind: 'shoot'; techniqueId: string | null }
+  | { kind: 'pass'; targetId: string; techniqueId: string | null; breakPast: number }
+  | { kind: 'shoot'; techniqueId: string | null; breakPast: number }
+
+/**
+ * How many defenders a throw takes on before it is made.
+ *
+ * FFX lets a carrier "break through as little as one to all" of the players on
+ * them, and whoever is beaten no longer has their blocking counted against the
+ * pass or shot that follows. It is a straight trade: endurance to clear the
+ * lane, against arriving with more of the throw intact.
+ */
+export type BreakPast = number
 
 export interface EncounterDefender {
   id: string
