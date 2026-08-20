@@ -1,5 +1,5 @@
 import { GOAL_HALF_HEIGHT, POOL_RADIUS, clampToPool, goalLineX, type Vec2 } from '../pitch'
-import { PASS_DECAY_PER_UNIT, SHOT_DECAY_PER_UNIT, rollStat } from '../encounter/formulas'
+import { PASS_DECAY_PER_UNIT, SHOT_DECAY_PER_UNIT, rollCatch } from '../encounter/formulas'
 import { attackDirection } from './formation'
 import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS, recordPrevious } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
@@ -191,7 +191,7 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   }
 
   if (keeper) {
-    flight.power -= rollStat(effectiveStat(keeper, 'ca'), state.rng)
+    flight.power -= rollCatch(effectiveStat(keeper, 'ca'), state.rng)
 
     if (flight.power <= 0) {
       awardExp(state, keeper, 'save')

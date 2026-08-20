@@ -1,5 +1,10 @@
 import { GOAL_HALF_HEIGHT, POOL_RADIUS, goalLineX } from '../pitch'
-import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT, rollBounds } from '../encounter/formulas'
+import {
+  ACTION_HP_COST,
+  SHOT_DECAY_PER_UNIT,
+  expectedCatch,
+  rollBounds,
+} from '../encounter/formulas'
 import {
   ENGAGE_RADIUS,
   blockRange,
@@ -52,6 +57,16 @@ const POINT_BLANK_RANGE = POOL_RADIUS * 0.16
  * chooses an action inside an encounter, so an unopposed attacker had no
  * mechanism to shoot at all and simply drove at the net until someone tackled
  * them. This is both where they stop advancing and where they let fly.
+ *
+ * Halved from a fifth of the pool, which was far enough out to make every shot
+ * in the game a formality. A shot bleeds `SHOT_DECAY_PER_UNIT` for every unit it
+ * travels, so pulling up out there spent five of a level-one shooter's eleven
+ * points of SH on the journey alone; what reached the keeper, after a blocker
+ * had taken their share, was almost exactly nothing. Sides were taking
+ * twenty-five shots a match and scoring none, and the difference between a
+ * fixture that produced goals and one that could not was a point or two of
+ * blocking either side of that knife edge. Attackers now carry the ball in far
+ * enough that the throw is still worth something when it arrives.
  */
 export const SHOOTING_STANDOFF = POOL_RADIUS * 0.22
 
@@ -132,7 +147,7 @@ export function isShotWorthTaking(
 
   const blocks = encounter ? blockRange(encounter.defenders) : { min: 0, max: 0 }
   const keeper = keeperFor(state, opponentOf(carrier.team))
-  const catching = keeper ? effectiveStat(keeper, 'ca') : 0
+  const catching = keeper ? expectedCatch(effectiveStat(keeper, 'ca')) : 0
 
   const power =
     effectiveStat(carrier, 'sh') -
@@ -331,12 +346,18 @@ export function chooseBreakPast(
 
   for (let count = 1; count <= defenders.length; count++) {
     const next = defenders[count - 1]!
-    // Never take on a challenge that could take the ball outright: losing it
-    // here means the throw never happens at all.
+    // Judged on the middle of the tackle too, for the same reason as the block
+    // above. Refusing any challenge that *could* take the ball reads as prudent
+    // and is in fact total paralysis: a level-one carrier holds EN 2–20 against
+    // defenders who tackle at 8–12, so the worst case beats them almost every
+    // time and they never clear anyone, ever. They then throw into the full
+    // blocking of everyone engaged, which cannot survive either. Choosing
+    // between a certain block and a possible tackle, take the tackle.
     const tackle = rollBounds(next.attack)
-    if (endurance - tackle.max <= 0) break
+    const likely = expected(tackle)
+    if (endurance - likely <= 0) break
 
-    endurance -= tackle.max
+    endurance -= likely
     if (power > expected(blockRange(defenders.slice(count)))) return count
   }
 

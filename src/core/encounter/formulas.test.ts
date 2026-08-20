@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CATCH_FLOOR,
+  CATCH_ROLL_MAX,
+  CATCH_ROLL_MIN,
   PASS_DECAY_PER_UNIT,
   ROLL_MAX,
   ROLL_MIN,
   SHOT_DECAY_PER_UNIT,
+  catchStrength,
+  expectedCatch,
   passDecay,
   rollBounds,
+  rollCatch,
   rollStat,
   shotDecay,
   tackleTotal,
@@ -112,5 +118,72 @@ describe('distance', () => {
   it('is deterministic, unlike the contests', () => {
     // Distance is the one part of a throw that is not a gamble.
     expect(passDecay(17)).toBe(passDecay(17))
+  })
+})
+
+describe("a keeper's catch", () => {
+  it('gives every keeper a floor to stand on', () => {
+    // Someone with no catching at all is still in front of the ring.
+    expect(catchStrength(0)).toBe(CATCH_FLOOR)
+    expect(catchStrength(-5)).toBe(CATCH_FLOOR)
+  })
+
+  it('still ranks keepers by their catching', () => {
+    const [keepa, nizarut, raudy, nimrook] = [5, 6, 8, 18].map(catchStrength)
+    expect(keepa).toBeLessThan(nizarut!)
+    expect(nizarut).toBeLessThan(raudy!)
+    expect(raudy).toBeLessThan(nimrook!)
+  })
+
+  it('narrows the gulf between the best and worst without closing it', () => {
+    // Raw, Nimrook catches at 3.6 times Keepa, which decided fixtures outright
+    // before a ball was thrown. The floor brings that inside a factor of three.
+    const raw = 18 / 5
+    const withFloor = catchStrength(18) / catchStrength(5)
+    expect(withFloor).toBeLessThan(raw)
+    expect(withFloor).toBeGreaterThan(1.5)
+  })
+
+  it('swings wider than an ordinary contested roll', () => {
+    expect(CATCH_ROLL_MIN).toBeLessThan(ROLL_MIN)
+    expect(CATCH_ROLL_MAX).toBeGreaterThan(ROLL_MAX)
+  })
+
+  it('rolls inside its own band', () => {
+    const rng = new Rng(7)
+    const strength = catchStrength(9)
+    for (let i = 0; i < 5000; i++) {
+      const roll = rollCatch(9, rng)
+      expect(roll).toBeGreaterThanOrEqual(Math.round(strength * CATCH_ROLL_MIN))
+      expect(roll).toBeLessThanOrEqual(Math.round(strength * CATCH_ROLL_MAX))
+    }
+  })
+
+  it('can be beaten, however good the keeper', () => {
+    const rng = new Rng(11)
+    const rolls = Array.from({ length: 2000 }, () => rollCatch(18, rng))
+    // Nimrook, the best keeper in the game, still has moments worse than a
+    // shot arriving with eight power. Without this the fixture is decided.
+    expect(Math.min(...rolls)).toBeLessThan(8)
+  })
+
+  it('saves something, however poor the keeper', () => {
+    const rng = new Rng(13)
+    const rolls = Array.from({ length: 2000 }, () => rollCatch(5, rng))
+    expect(Math.max(...rolls)).toBeGreaterThan(8)
+  })
+
+  it('expects the middle of its own band, not the bare stat', () => {
+    // What the AI shoots against. Reading the stat directly is what had
+    // shooters decline to shoot at all for whole matches.
+    expect(expectedCatch(9)).toBeCloseTo(catchStrength(9) * 1.1)
+    expect(expectedCatch(9)).not.toBeCloseTo(9)
+  })
+
+  it('averages out near the middle of the band over many rolls', () => {
+    const rng = new Rng(17)
+    const rolls = Array.from({ length: 20000 }, () => rollCatch(9, rng))
+    const mean = rolls.reduce((sum, r) => sum + r, 0) / rolls.length
+    expect(mean).toBeCloseTo(expectedCatch(9), 0)
   })
 })

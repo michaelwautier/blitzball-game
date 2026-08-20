@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   ENGAGE_RADIUS,
   LUNGE_SECONDS,
+  MAX_ENGAGED,
+  blockRange,
   engagingDefenders,
   openEncounter,
   resolveEncounter,
   tackleRange,
 } from './encounter'
+import { rollBounds } from './formulas'
 import { createMatch, stepMatch } from '../match/state'
 import { giveBallTo } from '../match/possession'
 import type { MatchState, Player } from '../match/types'
@@ -70,6 +73,91 @@ describe('engagement', () => {
     const engaged = engagingDefenders(state, carrier)
     const distances = engaged.map((d) => Math.hypot(d.x - carrier.x, d.y - carrier.y))
     expect([...distances].sort((a, b) => a - b)).toEqual(distances)
+  })
+
+  it('lets only two onto the carrier, however many are in reach', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:tidus', 5)
+    expect(engagingDefenders(state, carrier)).toHaveLength(MAX_ENGAGED)
+  })
+
+  it('picks the two nearest when a crowd arrives', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:tidus', 0)
+
+    const opponents = state.players.filter((p) => p.team === 'away' && p.slot !== 'GK')
+    // Deliberately in the opposite order to the players array, so passing this
+    // means it sorted rather than simply taking the first two it found.
+    opponents.forEach((defender, index) => {
+      defender.x = 1 + (opponents.length - index) * 0.4
+      defender.y = 0
+    })
+
+    const engaged = engagingDefenders(state, carrier).map((d) => d.id)
+    expect(engaged).toEqual([opponents.at(-1)!.id, opponents.at(-2)!.id])
+  })
+})
+
+describe('how much blocking gets counted', () => {
+  /** A stand-in encounter with the given blocking stats, closest first. */
+  const withBlockers = (...blocks: number[]) =>
+    blocks.map((block, index) => ({ id: `d${index}`, attack: 0, block }))
+
+  it('counts the nearest defender in full', () => {
+    const one = blockRange(withBlockers(10))
+    expect(one).toEqual(rollBounds(10))
+  })
+
+  it('counts the second at half, being behind the first', () => {
+    const alone = blockRange(withBlockers(10))
+    const pair = blockRange(withBlockers(10, 10))
+    // Two bodies do not block twice as much of an open ring.
+    expect(pair.max).toBeLessThan(alone.max * 2)
+    expect(pair.max).toBeGreaterThan(alone.max)
+  })
+
+  /**
+   * The range the menu quotes has to be the range that gets rolled.
+   *
+   * A shot carrying more than the advertised worst case must always survive the
+   * blocking, and one carrying less than the advertised best case must always be
+   * stopped by it. Anything else means the odds shown to a player, and the odds
+   * the AI reasons about, are not the odds being played.
+   */
+  const shootWith = (sh: number, seed: string) => {
+    const state = newMatch(seed)
+    const carrier = setUpEncounter(state, 'home:tidus', 2)
+    carrier.stats.sh = sh
+
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    const range = blockRange(encounter.defenders)
+    const results = Array.from({ length: 300 }, () => {
+      giveBallTo(state, carrier)
+      // Three hundred shots would otherwise leave him spent, and an exhausted
+      // player throws at half strength — which is a different test.
+      carrier.hp = carrier.def.stats.hp
+      return resolveEncounter(state, { ...encounter, endurance: 1000 }, {
+        kind: 'shoot',
+        techniqueId: null,
+        breakPast: 0,
+      })
+    })
+    return { range, results }
+  }
+
+  it('never blocks a throw carrying more than the range quoted', () => {
+    const { range, results } = shootWith(0, 'over')
+    const { results: strong } = shootWith(range.max + 1, 'over')
+    expect(strong.every((r) => r.success)).toBe(true)
+    // And the weak one is there to prove the fixture can block at all.
+    expect(results.some((r) => !r.success)).toBe(true)
+  })
+
+  it('always blocks a throw carrying less than the range quoted', () => {
+    const { range } = shootWith(1, 'under')
+    expect(range.min).toBeGreaterThan(0)
+    const { results } = shootWith(1, 'under')
+    expect(results.every((r) => !r.success)).toBe(true)
   })
 })
 
