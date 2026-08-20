@@ -26,6 +26,14 @@ export interface Player extends Movable {
   hp: number
   /** Conditions currently affecting this player. */
   statuses: StatusEffect[]
+  /**
+   * Seconds this player is out of the play, having just been beaten.
+   *
+   * A tackle that fails carries the defender past the carrier and leaves them
+   * turning round. While it runs down they neither swim nor engage, which is
+   * what makes getting past someone worth the endurance it costs.
+   */
+  recovery: number
 }
 
 export interface Ball extends Movable {

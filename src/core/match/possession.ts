@@ -1,5 +1,5 @@
 import { BALL_RADIUS } from '../pitch'
-import { PLAYER_RADIUS } from './movement'
+import { PLAYER_RADIUS, recordPrevious } from './movement'
 import { effectiveStat } from './stats'
 import type { MatchState, Player } from './types'
 
@@ -29,6 +29,13 @@ export function giveBallTo(state: MatchState, player: Player): void {
   state.ball.carrier = player.id
   state.ball.vx = 0
   state.ball.vy = 0
+  // Bring the ball with it rather than letting it catch up on the next tick.
+  // Possession can change during a frozen encounter, or alongside a player being
+  // repositioned, and in both cases the ball would otherwise sit visibly adrift
+  // from whoever is supposed to be holding it.
+  state.ball.x = player.x
+  state.ball.y = player.y
+  recordPrevious(state.ball)
   state.endurance = effectiveStat(player, 'en')
   state.pickupCooldown = 0
   state.engageCooldown = Math.max(state.engageCooldown, POSSESSION_GRACE)

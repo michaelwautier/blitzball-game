@@ -43,13 +43,23 @@ export const AI_THINK_SECONDS = 0.35
 export const RESULT_SECONDS = 1.1
 
 /**
- * Seconds defenders are held off after a successful breakthrough.
+ * Seconds before *anyone* may engage again after a successful breakthrough.
  *
- * This, with `POSSESSION_GRACE`, is what sets the rhythm of a match. Short
- * values produce hundreds of encounters and a game that is nothing but menus;
- * these give a possession room to actually travel before it is challenged again.
+ * Deliberately brief now that beaten defenders are individually put out of the
+ * play: this only stops an encounter reopening on the very next tick. A long
+ * global hold was a blunt instrument, freezing defenders who had nothing to do
+ * with the challenge.
  */
-export const BREAKTHROUGH_GRACE = 2.5
+export const BREAKTHROUGH_GRACE = 0.8
+
+/**
+ * Seconds a beaten defender spends out of the play.
+ *
+ * Long enough that getting past someone means actually being past them. Without
+ * it they turned round and re-engaged almost immediately, so a breakthrough
+ * bought a moment rather than an advantage.
+ */
+export const BREAKTHROUGH_RECOVERY = 1.6
 
 /** Seconds before the next encounter after any other outcome. */
 export const RESUME_GRACE = 1.5
@@ -61,6 +71,8 @@ export function engagingDefenders(state: MatchState, carrier: Player): Player[] 
       (p) =>
         p.team === opponentOf(carrier.team) &&
         p.slot !== 'GK' &&
+        // Still recovering from being beaten, so in no position to challenge.
+        p.recovery <= 0 &&
         distanceBetween(p, carrier) <= ENGAGE_RADIUS,
     )
     .sort((a, b) => distanceBetween(a, carrier) - distanceBetween(b, carrier))
@@ -301,6 +313,7 @@ function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player
     defender.y = spot.y
     defender.vx = 0
     defender.vy = 0
+    defender.recovery = BREAKTHROUGH_RECOVERY
     recordPrevious(defender)
   }
 }

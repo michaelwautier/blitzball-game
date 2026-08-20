@@ -245,6 +245,8 @@ export class Renderer {
 
     ctx.beginPath()
     ctx.arc(x, y, PLAYER_RADIUS, 0, Math.PI * 2)
+    // Faded while out of the play, so the radar shows who cannot challenge.
+    ctx.globalAlpha = player.recovery > 0 ? 0.35 : 1
     ctx.fillStyle = colours.primary
     if (hasBall) {
       ctx.shadowColor = colours.primary
@@ -256,6 +258,7 @@ export class Renderer {
     ctx.lineWidth = player.slot === 'GK' ? 0.7 : 0.4
     ctx.strokeStyle = colours.secondary
     ctx.stroke()
+    ctx.globalAlpha = 1
 
     if (this.compact) return
 

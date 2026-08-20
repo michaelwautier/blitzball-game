@@ -282,10 +282,13 @@ export class SceneRenderer {
     body.ring.visible = controlled
     body.marker.visible = state.ball.carrier === player.id
 
-    // Stamina shows as the body dimming rather than as another gauge to read.
+    // Stamina shows as the body dimming rather than as another gauge to read,
+    // and a beaten defender goes darker still while they are out of the play.
     const fraction = Math.max(0, Math.min(1, player.hp / player.stats.hp))
     const material = body.mesh.material as THREE.MeshStandardMaterial
-    material.emissiveIntensity = 0.08 + fraction * 0.32
+    material.emissiveIntensity = player.recovery > 0 ? 0.02 : 0.08 + fraction * 0.32
+    material.opacity = player.recovery > 0 ? 0.45 : 1
+    material.transparent = player.recovery > 0
     if (isExhausted(player)) material.emissive.setHex(COLOURS.danger)
 
     const labels = statusLabels(player)
