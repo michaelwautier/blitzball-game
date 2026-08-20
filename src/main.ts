@@ -3,6 +3,7 @@ import {
   cancelActionMenu,
   createMatch,
   requestActionMenu,
+  requestChallenge,
   stepMatch,
   submitDefence,
   submitEncounterAction,
@@ -192,9 +193,10 @@ window.addEventListener('keydown', (event) => {
   if (event.key === '~' || event.key === '`') overlay.toggle()
   if (!state) return
 
-  // Stop and look up. Space would otherwise scroll the page.
+  // The same key means the same thing on both sides of the ball: take charge of
+  // this moment. On it, stop and look up; off it, go and challenge.
   if (event.key === ' ' || event.key === 'Enter') {
-    if (requestActionMenu(state)) event.preventDefault()
+    if (requestActionMenu(state) || requestChallenge(state)) event.preventDefault()
   }
 
   // Take the defender best placed to challenge. Tab would otherwise move focus.
@@ -247,6 +249,7 @@ if (import.meta.env.DEV) {
       submitEncounterAction,
       submitDefence,
       requestActionMenu,
+      requestChallenge,
       cancelActionMenu,
       switchControlled,
     },

@@ -43,6 +43,20 @@ export interface Player extends Movable {
    * what makes getting past someone worth the endurance it costs.
    */
   recovery: number
+  /**
+   * Seconds before this defender may drag someone into an encounter again.
+   *
+   * Distinct from `recovery`, and the distinction is the whole point: a
+   * defender who has just committed to a carrier and watched the ball leave is
+   * not *beaten*, so they keep swimming and chasing — they simply cannot
+   * immediately haul the next carrier into another decision.
+   *
+   * This used to be a single global timer on the match, which blacked out every
+   * encounter anywhere in the pool for four seconds after any pass. On the ball
+   * that was invisible, because a carrier can always stop and look up. Off it,
+   * it meant sitting glued to an opponent unable to do anything at all.
+   */
+  engageCooldown: number
 }
 
 /** A defender's committed challenge, carrying them past the carrier. */
@@ -213,7 +227,14 @@ export interface MatchState {
   controlled: string
   /** Seconds until a loose ball may be collected, so a loss is not undone instantly. */
   pickupCooldown: number
-  /** Seconds before defenders may engage again, so a breakthrough has value. */
+  /**
+   * Seconds before *anybody* may open an encounter.
+   *
+   * Kept short, and only for restarts: a kickoff, a keeper's clearance, and the
+   * instant after a breakthrough, where an encounter reopening immediately would
+   * undo what just happened. Everything else that used to live here is now a
+   * cooldown on the individual defenders who committed — see `Player`.
+   */
   engageCooldown: number
   /**
    * Endurance left for the current possession, refreshed when it changes hands.

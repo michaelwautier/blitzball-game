@@ -31,7 +31,7 @@ export class DebugOverlay {
       `you     ${controlled ? `${controlled.def.name} ${controlled.slot}` : '—'}`,
       '',
       'WASD / arrows to swim',
-      'space to stop and look up',
+      'space to stop and look up, or to challenge when defending',
       'tab / q to switch player',
       'arrows and space to choose in an encounter',
       '~ toggle overlay',

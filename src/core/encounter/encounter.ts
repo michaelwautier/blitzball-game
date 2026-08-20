@@ -76,7 +76,37 @@ export const BREAKTHROUGH_GRACE = 2
  */
 export const BREAKTHROUGH_RECOVERY = 1.6
 
-/** Seconds before the next encounter after any other outcome. */
+/**
+ * Seconds before *this defender* may challenge again.
+ *
+ * They committed to a carrier and the moment passed. They are not beaten — they
+ * keep swimming, marking and blocking — but a defender cannot throw themselves
+ * at two decisions in the same breath.
+ *
+ * Deliberately shorter than `RESUME_GRACE`, which means it never binds on the
+ * engine: by the time the global pacing allows another encounter, this has long
+ * expired. It exists for the one case that *does* bypass the global grace — a
+ * person pressing the challenge key — so that repeatedly mashing it cannot turn
+ * one defender into a machine for manufacturing encounters.
+ *
+ * A longer cooldown here was tried, on the theory that per-defender pacing could
+ * replace the global blackout entirely. It cannot: five outfielders a side is a
+ * deep enough bench that encounters saturated at 177–246 a match even at eleven
+ * seconds each, and the sides with weak defences were punished hardest — Besaid
+ * went from 124:329 to 52:379. The global grace paces the game; this only stops
+ * an individual being spammed.
+ */
+export const ENGAGED_COOLDOWN = 2
+
+/**
+ * Seconds before the engine opens another encounter of its own accord.
+ *
+ * This is the pacing dial #24 tuned, and it is back near where it left it. What
+ * has changed is that it no longer traps anybody: a defender who wants to
+ * challenge during it can, through `requestChallenge`, exactly as a carrier has
+ * always been able to stop and look up. It governs what the game does by itself,
+ * not what a person is allowed to do.
+ */
 export const RESUME_GRACE = 4
 
 /**
@@ -110,6 +140,8 @@ export function engagingDefenders(state: MatchState, carrier: Player): Player[] 
         p.slot !== 'GK' &&
         // Still recovering from being beaten, so in no position to challenge.
         p.recovery <= 0 &&
+        // Or committed a moment ago: chasing again, but not yet challenging.
+        p.engageCooldown <= 0 &&
         distanceBetween(p, carrier) <= ENGAGE_RADIUS,
     )
     .sort((a, b) => distanceBetween(a, carrier) - distanceBetween(b, carrier))
@@ -456,6 +488,22 @@ function resolveBreakthrough(
     success: true,
     continues: true,
     summary: `${sums} · past ${beatenNames(challenge)}, still held`,
+  }
+}
+
+/**
+ * Put the defenders who were on the carrier out of the challenging business.
+ *
+ * They committed, and the moment has passed — whether the carrier threw, barged
+ * past them, or lost it. They carry on swimming, since this is not being beaten,
+ * but the next carrier is somebody else's to pick up.
+ *
+ * Charged wherever an encounter *ends*, so no outcome is a free re-engagement.
+ */
+export function chargeCommittedDefenders(state: MatchState, encounter: Encounter): void {
+  for (const engaged of encounter.defenders) {
+    const defender = playerById(state, engaged.id)
+    if (defender) defender.engageCooldown = ENGAGED_COOLDOWN
   }
 }
 

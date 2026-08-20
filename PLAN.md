@@ -182,16 +182,21 @@ against the ladder alone.
    that is information, but holding an arrow never gets stuck on it. The number keys are gone
    rather than kept as a shortcut: they were redundant the moment this existed, and the row
    chips were noise in a box that had just been narrowed. UI only.
-7. **Make defending feel like defending.** `engageCooldown` is a single global timer, so every
-   reception and every completed throw blacks out *all* encounters for four seconds — and on
-   top of that, attacking has an override that defending does not: `requestActionMenu` (the
-   space bar) never checks the cooldown, so a carrier can stop and think whenever they like
-   while a defender can only wait. The result is being glued to an opponent for seconds with
-   no way to challenge. The fix is not to lower the constant, which would undo #24's work, but
-   to make the cooldown per-defender — beaten defenders already recover individually through
-   `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
-   challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
-   what #24 spent its effort on.
+7. **Make defending feel like defending** ✅ (#37). The complaint was exact: glued to an
+   opponent, waiting seconds for anything to happen. The cause was that `engageCooldown` is a
+   single global timer blacking out every encounter in the pool for four seconds after any
+   pass — and that attacking had an override defending did not, since `requestActionMenu` (the
+   space bar) never consulted it.
+   Defending gets the same key: off the ball it challenges the carrier, bypassing the global
+   grace exactly as stopping to look up always has. That grace paces what the game does *by
+   itself*; it should never have decided what a person is allowed to do.
+   The per-defender cooldown proposed alongside it was **tried and largely rejected by
+   measurement**. Replacing the global grace with it saturated encounters at 177–246 a match
+   even at eleven seconds each — five outfielders a side is too deep a bench — and it punished
+   weak defences hardest, taking Besaid from 124:329 to 52:379. It survives only at two
+   seconds, short enough never to bind on the engine, for the one job it is good at: stopping
+   a person mashing the challenge key. With the global grace restored the ladder is identical
+   to #35's, which is the point — the fix is a new option, not a change to the game's pacing.
 8. **A throw flies to where it was aimed.** Fidelity, not taste: this is how the original
    behaves, and ours does not. Two faults, one subject. Power is currently
    drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
