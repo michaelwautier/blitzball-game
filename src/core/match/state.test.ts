@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createMatch, releaseBall, resetForKickoff, stepMatch } from './state'
+import { giveBallTo } from './possession'
 import type { MatchInput, MatchState, Player } from './types'
 import { carrierOf, playerById } from './queries'
 import { PLAYER_RADIUS } from './movement'
@@ -217,6 +218,52 @@ describe('possession', () => {
     releaseBall(state, 0, 0)
     run(state, 120)
     expect(state.ball.carrier).not.toBeNull()
+  })
+})
+
+describe('carrying the ball costs', () => {
+  it('drains the carrier while they swim with it', () => {
+    const state = newMatch('drain')
+    const carrier = state.players.find((p) => p.id === state.controlled)!
+    giveBallTo(state, carrier)
+    const before = carrier.hp
+
+    run(state, 120, { move: { x: 1, y: 0 } })
+
+    expect(carrier.hp, 'carrying was free').toBeLessThan(before)
+  })
+
+  it('lets everyone else get their breath back', () => {
+    const state = newMatch('regen')
+    const carrier = state.players.find((p) => p.id === state.controlled)!
+    giveBallTo(state, carrier)
+
+    const resting = state.players.find((p) => p.id !== carrier.id && p.team === 'home')!
+    resting.hp = 10
+    run(state, 120)
+
+    expect(resting.hp).toBeGreaterThan(10)
+  })
+
+  it('never drains past empty', () => {
+    const state = newMatch('empty')
+    const carrier = state.players.find((p) => p.id === state.controlled)!
+    giveBallTo(state, carrier)
+    carrier.hp = 0.2
+
+    run(state, 300)
+    expect(carrier.hp).toBe(0)
+  })
+
+  it('costs the ball-carrier more than standing still saves them', () => {
+    // The point of the change: being denied regen is not the same as paying.
+    const state = newMatch('compare')
+    const carrier = state.players.find((p) => p.id === state.controlled)!
+    giveBallTo(state, carrier)
+    carrier.hp = 100
+
+    run(state, 180)
+    expect(carrier.hp).toBeLessThan(100)
   })
 })
 

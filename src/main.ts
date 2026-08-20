@@ -29,6 +29,7 @@ import { EncounterMenu } from './ui/encounter-menu'
 import { LeagueScreen } from './ui/league-screen'
 import { MatchSummary } from './ui/match-summary'
 import { Scoreboard } from './ui/scoreboard'
+import { StatPanel } from './ui/stat-panel'
 import type { TeamDef } from './data/types'
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -45,6 +46,7 @@ const scene = new SceneRenderer(element<HTMLCanvasElement>('#game'))
 const radar = new Renderer(element<HTMLCanvasElement>('#radar'), { compact: true })
 const scoreboard = new Scoreboard(element('#scoreboard'), element('#banner'))
 const overlay = new DebugOverlay(element('#debug'))
+const statPanel = new StatPanel(element('#stats'))
 const input = new KeyboardInput()
 const slot = localStorageSlot()
 
@@ -146,7 +148,10 @@ function showMatch(playing: boolean): void {
   element('#game').hidden = !playing
   element('#radar').hidden = !playing
   element('#scoreboard').hidden = !playing
-  if (!playing) element('#banner').hidden = true
+  if (!playing) {
+    element('#banner').hidden = true
+    element('#stats').hidden = true
+  }
   if (playing) scene.resize()
 }
 
@@ -164,6 +169,7 @@ const loop = createLoop({
     scene.draw(state, alpha, TICK_SECONDS)
     radar.draw(state, alpha)
     scoreboard.update(state)
+    statPanel.update(state)
     menu.update(state)
     summary.update(state, () => {
       // Banked exactly once: the summary asks for this only on the frame the
@@ -223,6 +229,7 @@ if (import.meta.env.DEV) {
       scene,
       radar,
       menu,
+      statPanel,
       summary,
       league,
       save,

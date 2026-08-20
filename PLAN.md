@@ -161,12 +161,13 @@ against the ladder alone.
    play for free by re-deciding each think-tick. Measured: scoring held at 2.4 goals a match
    and breaking did not become dominant (12.2 breaks against 20.6 shots a match), though the
    already-thin tails thinned further — see issue #25.
-4. **Top-right stat stack, and HP drains while carrying.** The FFX panel: the carrier's name
-   and effective `HP EN PA SH` always (either team's), plus one row per engaged defender
-   (`HP AT BL`, from the encounter's own snapshot — the numbers actually rolled) during
-   encounters. With it, carrying the ball drains HP (`CARRY_DRAIN_PER_SECOND`, starting
-   ~0.5/s) instead of merely denying regen, floored at zero so exhaustion stays the penalty.
-   Ladder-measured; technique affordability is the number to watch.
+4. **Top-right stat stack, and HP drains while carrying** ✅ (#34). The FFX panel: the
+   carrier's name and effective `HP EN PA SH` — whichever side has it — plus one row per
+   engaged defender (`HP AT BL`, taken from the encounter's own snapshot, so the panel shows
+   the numbers that actually get rolled). Carrying now drains HP at `CARRY_DRAIN_PER_SECOND`
+   rather than merely forgoing regen, floored at zero so exhaustion stays the penalty.
+   Measured at 0.5/s: costs about 0.12 goals a match, with shots and encounters unmoved, so
+   stamina matters without distorting anything.
 5. **Encounter staging and camera.** Engaged defenders glide (via the existing lunge
    mechanism) into a line between the attacker and their goal when the encounter opens, and
    the camera dollies toward the tableau while the menu is up. Mostly presentation, but the

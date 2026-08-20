@@ -25,7 +25,7 @@ import {
 } from './movement'
 import { collectLooseBall, giveBallTo } from './possession'
 import { tickStatuses } from './status'
-import { HP_REGEN_PER_SECOND } from '../encounter/formulas'
+import { CARRY_DRAIN_PER_SECOND, HP_REGEN_PER_SECOND } from '../encounter/formulas'
 import { carrierOf, opponentOf, playerById, speedOf } from './queries'
 import {
   NO_INPUT,
@@ -311,15 +311,21 @@ function maybeShootOnSight(state: MatchState): void {
 /**
  * Advance conditions and recover stamina.
  *
- * Only the player on the ball is denied recovery: carrying is the work, and
- * everyone else is catching their breath. Poison drains faster than the regen
- * rate, so a poisoned player keeps losing ground until it wears off.
+ * The player on the ball loses HP rather than gaining it: carrying is the work,
+ * and everyone else is catching their breath. Poison drains faster than the
+ * regen rate, so a poisoned player keeps losing ground until it wears off.
  */
 function updateCondition(state: MatchState, dt: number): void {
   for (const player of state.players) {
     tickStatuses(player, dt)
     player.recovery = Math.max(0, player.recovery - dt)
-    if (state.ball.carrier === player.id) continue
+
+    // Carrying costs; everyone else is catching their breath.
+    if (state.ball.carrier === player.id) {
+      player.hp = Math.max(0, player.hp - CARRY_DRAIN_PER_SECOND * dt)
+      continue
+    }
+
     player.hp = Math.min(player.stats.hp, player.hp + HP_REGEN_PER_SECOND * dt)
   }
 }
