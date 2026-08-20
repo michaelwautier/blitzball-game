@@ -1,6 +1,6 @@
 import { POOL_RADIUS, clampToPool } from '../pitch'
 import { attackDirection } from '../match/formation'
-import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS, recordPrevious } from '../match/movement'
+import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS } from '../match/movement'
 import { distanceBetween, opponentOf, playerById } from '../match/queries'
 import { giveBallTo } from '../match/possession'
 import { startPass, startShot } from '../match/flight'
@@ -293,7 +293,15 @@ function resolveBreakthrough(
 }
 
 /**
- * Put the defenders who tackled behind the carrier.
+ * Seconds a beaten defender takes to be carried past the carrier.
+ *
+ * Short: a challenge is a lunge, not a swim. It runs inside the recovery period,
+ * so they arrive behind the play and then spend the rest of it turning round.
+ */
+export const LUNGE_SECONDS = 0.32
+
+/**
+ * Send the defenders who tackled past the carrier.
  *
  * A challenge carries a defender past the player they went through, so leaving
  * them in front would mean a successful breakthrough changed nothing
@@ -309,12 +317,19 @@ function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player
       { x: carrier.x - forward * (ENGAGE_RADIUS + 1), y: defender.y },
       PLAYER_RADIUS,
     )
-    defender.x = spot.x
-    defender.y = spot.y
+    // Committed as a movement rather than applied as a jump, so it is something
+    // you watch happen: they carry through the carrier and pull up behind.
+    defender.lunge = {
+      fromX: defender.x,
+      fromY: defender.y,
+      toX: spot.x,
+      toY: spot.y,
+      duration: LUNGE_SECONDS,
+      elapsed: 0,
+    }
     defender.vx = 0
     defender.vy = 0
     defender.recovery = BREAKTHROUGH_RECOVERY
-    recordPrevious(defender)
   }
 }
 

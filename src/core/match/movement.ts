@@ -1,4 +1,5 @@
 import { POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
+import type { Lunge } from './types'
 
 /**
  * The pool size the speed and decay constants were tuned against.
@@ -109,4 +110,25 @@ export function steerWithIntent(m: Movable, direction: Vec2, speed: number, dt: 
   }
   const scale = (speed * Math.min(1, magnitude)) / magnitude
   accelerateAndMove(m, direction.x * scale, direction.y * scale, dt)
+}
+
+
+/**
+ * Carry a lunging body along its committed path.
+ *
+ * Eased at both ends, so a challenge reads as a player throwing themselves past
+ * someone and pulling up, rather than sliding at a constant rate. Returns true
+ * while the movement is still running.
+ */
+export function advanceLunge(m: Movable, lunge: Lunge, dt: number): boolean {
+  lunge.elapsed += dt
+  const t = Math.min(1, lunge.elapsed / lunge.duration)
+  const eased = t * t * (3 - 2 * t)
+
+  m.x = lunge.fromX + (lunge.toX - lunge.fromX) * eased
+  m.y = lunge.fromY + (lunge.toY - lunge.fromY) * eased
+  m.vx = 0
+  m.vy = 0
+
+  return t < 1
 }

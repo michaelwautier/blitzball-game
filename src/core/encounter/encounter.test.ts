@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ENGAGE_RADIUS,
+  LUNGE_SECONDS,
   engagingDefenders,
   openEncounter,
   resolveEncounter,
@@ -166,7 +167,7 @@ describe('breakthrough', () => {
     expect(state.ball.carrier).toBe(engaged[0]!.id)
   })
 
-  it('leaves every defender who tackled behind the carrier', () => {
+  it('carries every defender who tackled past the carrier', () => {
     const state = newMatch()
     const carrier = setUpEncounter(state, 'home:wakka', 2)
     const engaged = engagingDefenders(state, carrier)
@@ -175,12 +176,40 @@ describe('breakthrough', () => {
 
     resolveEncounter(state, encounter, { kind: 'breakthrough' })
 
+    // The challenge is a movement, not a jump: they are still in front at the
+    // moment it is committed.
+    for (const defender of engaged) expect(defender.lunge).not.toBeNull()
+
+    for (let i = 0; i < Math.ceil(LUNGE_SECONDS * 60) + 2; i++) stepMatch(state, 1 / 60)
+
     // Home attacks +x, so behind the carrier is to their left.
     for (const defender of engaged) {
       expect(defender.x, `${defender.def.name}`).toBeLessThan(carrier.x)
-      // Moved rather than swum: no interpolation gap left behind.
-      expect(Math.hypot(defender.x - defender.prevX, defender.y - defender.prevY)).toBe(0)
+      expect(defender.lunge, `${defender.def.name} still lunging`).toBeNull()
     }
+  })
+
+  it('travels there rather than jumping', () => {
+    const state = newMatch('travel')
+    const carrier = setUpEncounter(state, 'home:wakka', 1)
+    const defender = engagingDefenders(state, carrier)[0]!
+    const encounter = openEncounter(state, carrier, [defender])
+    encounter.endurance = 100
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const start = { x: defender.x, y: defender.y }
+
+    // Sampled part way through, they are somewhere between the two ends — which
+    // is what makes it something you can watch rather than a body blinking from
+    // one side of the carrier to the other.
+    for (let i = 0; i < Math.ceil(LUNGE_SECONDS * 30); i++) stepMatch(state, 1 / 60)
+
+    const target = defender.lunge
+    expect(target).not.toBeNull()
+    const travelled = Math.hypot(defender.x - start.x, defender.y - start.y)
+    const whole = Math.hypot(target!.toX - start.x, target!.toY - start.y)
+    expect(travelled).toBeGreaterThan(0)
+    expect(travelled).toBeLessThan(whole)
   })
 
   it('puts every beaten defender out of the play for a moment', () => {
@@ -245,10 +274,16 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engaged)
     encounter.endurance = 1
 
+    // Where the carrier was when the challenge landed. Both players move on
+    // afterwards — the tackler has the ball now — so the comparison has to be
+    // against that moment rather than against wherever they end up.
+    const dispossessedAt = carrier.x
+
     resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    for (let i = 0; i < Math.ceil(LUNGE_SECONDS * 60) + 2; i++) stepMatch(state, 1 / 60)
 
     expect(state.ball.carrier).toBe(engaged[0]!.id)
-    expect(engaged[0]!.x).toBeLessThan(carrier.x)
+    expect(engaged[0]!.x).toBeLessThan(dispossessedAt)
   })
 
   it('loses the ball to the strongest tackler when endurance runs out', () => {

@@ -16,6 +16,7 @@ import { kickoffPosition } from './formation'
 import { stepFlight } from './flight'
 import {
   PLAYER_RADIUS,
+  advanceLunge,
   recordPrevious,
   steerTowards,
   steerWithIntent,
@@ -126,6 +127,7 @@ function buildSide(team: TeamState, careers: CareerLookup): Player[] {
       hp: stats.hp,
       statuses: [],
       recovery: 0,
+      lunge: null,
     }
   })
 }
@@ -141,6 +143,7 @@ export function resetForKickoff(state: MatchState): void {
     player.vx = 0
     player.vy = 0
     player.recovery = 0
+    player.lunge = null
   }
 
   const { ball } = state
@@ -324,6 +327,12 @@ function movePlayers(state: MatchState, dt: number, input: MatchInput): void {
   )
 
   state.players.forEach((player, index) => {
+    // Mid-challenge: carried along a committed path rather than swimming.
+    if (player.lunge) {
+      if (!advanceLunge(player, player.lunge, dt)) player.lunge = null
+      return
+    }
+
     // Beaten a moment ago and still turning round: no swimming either way.
     if (player.recovery > 0) {
       steerTowards(player, player, 0, dt)
@@ -590,6 +599,10 @@ function separatePlayers(state: MatchState): void {
 
     for (let i = 0; i < count; i++) {
       const player = state.players[i]!
+      // A player mid-challenge still shoves others aside but is not shoved off
+      // their own path, or the lunge stalls against the body it is going past.
+      if (player.lunge) continue
+
       const inside = clampToPool(
         { x: player.x + shiftX[i]!, y: player.y + shiftY[i]! },
         PLAYER_RADIUS,
