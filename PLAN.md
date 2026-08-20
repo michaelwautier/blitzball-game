@@ -161,12 +161,13 @@ against the ladder alone.
    play for free by re-deciding each think-tick. Measured: scoring held at 2.4 goals a match
    and breaking did not become dominant (12.2 breaks against 20.6 shots a match), though the
    already-thin tails thinned further — see issue #25.
-4. **Top-right stat stack, and HP drains while carrying.** The FFX panel: the carrier's name
-   and effective `HP EN PA SH` always (either team's), plus one row per engaged defender
-   (`HP AT BL`, from the encounter's own snapshot — the numbers actually rolled) during
-   encounters. With it, carrying the ball drains HP (`CARRY_DRAIN_PER_SECOND`, starting
-   ~0.5/s) instead of merely denying regen, floored at zero so exhaustion stays the penalty.
-   Ladder-measured; technique affordability is the number to watch.
+4. **Top-right stat stack, and HP drains while carrying** ✅ (#34). The FFX panel: the
+   carrier's name and effective `HP EN PA SH` — whichever side has it — plus one row per
+   engaged defender (`HP AT BL`, taken from the encounter's own snapshot, so the panel shows
+   the numbers that actually get rolled). Carrying now drains HP at `CARRY_DRAIN_PER_SECOND`
+   rather than merely forgoing regen, floored at zero so exhaustion stays the penalty.
+   Measured at 0.5/s: costs about 0.12 goals a match, with shots and encounters unmoved, so
+   stamina matters without distorting anything.
 5. **Encounter staging and camera.** Engaged defenders glide (via the existing lunge
    mechanism) into a line between the attacker and their goal when the encounter opens, and
    the camera dollies toward the tableau while the menu is up. Mostly presentation, but the
@@ -184,6 +185,31 @@ against the ladder alone.
    `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
    challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
    what #24 spent its effort on.
+8. **A throw flies to where it was aimed.** Two faults, one subject. Power is currently
+   drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
+   and is collected by `nearestOpponent` — nearest to the **ball**, which is a defender
+   standing on the trajectory. That reads as an interception by someone who, by design, is not
+   allowed to intercept: only the defenders who engaged the carrier contest a throw, and they
+   did so at the encounter. It also contradicts this file, which already says the *receiver*
+   fumbles it. So: a throw always travels to its target, decay is settled on arrival, and a
+   throw that arrives spent is fumbled there — after which the ball visibly travels on to
+   whoever collects it, rather than teleporting. Second fault: the `flight` phase runs
+   `movePlayers`, so everyone swims while the ball is in the air. FFX holds them still; the
+   clock keeps running. `FLIGHT_SPEED` comes down so all of this is legible rather than
+   instantaneous. Ladder-measured — freezing removes the defensive drift that currently
+   happens during every single pass.
+9. **A bigger pool and a closer camera.** Two constants, but not a free change:
+   `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
+   most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
+   goals a match rather than accepting whatever falls out.
+10. **Team strategies.** The first genuinely tactical decision the user gets. Each side plays a
+    defensive shape with real trade-offs — pressing commits everyone to the carrier and leaves
+    the passing lanes open; zone holds shape and concedes the carrier room; man-marking sits
+    between — and can switch mid-match to answer what the other side is doing. Mechanically
+    this is `CHASERS` and `markingSpot` in `positioning.ts` becoming strategy-driven rather
+    than constant. Each team gets a default that suits its squad: the Guado's blocking suits a
+    zone, the Ronso's attack suits pressing. Needs a ladder pass *per strategy* to show each is
+    viable rather than one being strictly best, which is the whole point of having them.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

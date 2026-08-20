@@ -263,6 +263,50 @@
         opacity: 0.45;
       }
 
+      /* Who has the ball, and who is on them. FFX puts this top-right. */
+      #stats {
+        position: fixed;
+        top: 14px;
+        right: 16px;
+        width: min(380px, 46vw);
+        display: grid;
+        gap: 3px;
+        pointer-events: none;
+        text-shadow: 0 2px 10px rgb(0 0 0 / 0.9);
+      }
+      .sp-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 3px 8px;
+        border-bottom: 2px solid rgb(127 216 255 / 0.5);
+        background: linear-gradient(to right, transparent, rgb(6 16 28 / 0.55));
+        font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .sp-name {
+        margin-right: auto;
+        font: 600 14px ui-sans-serif, system-ui, sans-serif;
+        white-space: nowrap;
+      }
+      /* Defenders read as the opposition: dimmer, and tinted against. */
+      .sp-defender {
+        background: linear-gradient(to right, transparent, rgb(60 12 12 / 0.5));
+        border-bottom-color: rgb(255 139 122 / 0.45);
+        font-size: 12px;
+        opacity: 0.92;
+      }
+      .sp-stat b {
+        color: #ffb35c;
+        font-weight: 700;
+      }
+      .sp-stat i {
+        margin-left: 2px;
+        font-style: normal;
+        font-size: 10px;
+        opacity: 0.6;
+      }
+
       /* League screen */
       #league {
         position: fixed;
@@ -469,6 +513,7 @@
     <pre id="debug"></pre>
     <div id="encounter" hidden></div>
     <div id="summary" hidden></div>
+    <div id="stats" hidden></div>
     <div id="league" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

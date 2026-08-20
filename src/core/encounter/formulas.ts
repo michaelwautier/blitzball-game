@@ -149,3 +149,21 @@ export const ACTION_HP_COST = {
  * constrains anything and the best technique is simply used every single time.
  */
 export const HP_REGEN_PER_SECOND = 0.35
+
+/**
+ * HP drained per second by the player carrying the ball.
+ *
+ * Carrying is work. FFX shows the carrier's HP falling as they swim, and it is
+ * what stops holding the ball being free: a carrier who dawdles arrives at the
+ * decision with less to spend on the technique they wanted.
+ *
+ * Previously the carrier was merely denied the regen everyone else gets, which
+ * is not the same thing — it made carrying cost nothing except the opportunity
+ * to recover, so a fresh player could dribble indefinitely.
+ *
+ * Sized against the real HP pools of 90–389 and the 2–5 an action costs: about
+ * twenty seconds on the ball is worth one shot's worth of stamina. Floored at
+ * zero, so the penalty for running dry stays exhaustion — half stats — rather
+ * than anything new.
+ */
+export const CARRY_DRAIN_PER_SECOND = 0.5
