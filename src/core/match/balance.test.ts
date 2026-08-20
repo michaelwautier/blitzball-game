@@ -14,7 +14,7 @@ import {
 } from '../ai/decisions'
 import { autoIntent } from '../ai/autopilot'
 import { USER_TEAM } from './types'
-import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
+import { BESAID_AUROCHS, LUCA_GOERS, TEAMS } from '../../data/teams'
 
 const TICK = 1 / 60
 
@@ -34,8 +34,12 @@ interface MatchReport {
  * hundreds of times in a test. It is also exactly what Phase 4 will use to
  * simulate the league fixtures the user is not playing in.
  */
-function simulateMatch(seed: string, homeTeam = BESAID_AUROCHS): MatchReport {
-  const state = createMatch(homeTeam, LUCA_GOERS, seed)
+function simulateMatch(
+  seed: string,
+  homeTeam = BESAID_AUROCHS,
+  awayTeam = LUCA_GOERS,
+): MatchReport {
+  const state = createMatch(homeTeam, awayTeam, seed)
   const report: MatchReport = { home: 0, away: 0, encounters: 0, shots: 0, breakthroughs: 0 }
 
   let lastPhase = state.phase.kind
@@ -146,6 +150,25 @@ describe('match balance', () => {
   it('is reproducible: the same seed replays the same scoreline', () => {
     expect(simulateMatch('balance-0')).toEqual(reports[0])
   })
+})
+
+describe('the rest of the league', () => {
+  /**
+   * Every side can actually take the pitch.
+   *
+   * The four teams added alongside this are pure data, but data the engine has
+   * never seen: the Ronso swim at speed 40 where everyone else swims at 60, the
+   * Guado at 75, and Nimrook catches at 18 against Keepa's 5. Any of those could
+   * find an assumption baked into positioning or the AI's decisions. Playing a
+   * full match against each is the cheapest way to know they do not.
+   */
+  it.each(TEAMS.filter((team) => team.id !== BESAID_AUROCHS.id).map((t) => [t.name, t] as const))(
+    'plays a full match against the Aurochs: %s',
+    (_name, opponent) => {
+      const report = simulateMatch(`league-${opponent.id}`, BESAID_AUROCHS, opponent)
+      expect(report.encounters, 'the two sides never met').toBeGreaterThan(5)
+    },
+  )
 })
 
 describe('side fairness', () => {
