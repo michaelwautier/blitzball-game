@@ -6,7 +6,8 @@ import {
   goalLineX,
   type Side,
 } from '../core/pitch'
-import type { MatchState } from '../core/match/state'
+import { PLAYER_RADIUS } from '../core/match/movement'
+import type { MatchState, Player } from '../core/match/state'
 
 /** Slack around the pool so the boundary glow is not clipped at the canvas edge. */
 const VIEW_RADIUS = POOL_RADIUS * 1.06
@@ -19,15 +20,17 @@ const COLOURS = {
   markings: 'rgb(190 235 255 / 0.28)',
   goal: '#ffd479',
   ball: '#ffffff',
+  controlRing: '#ffffff',
+  label: 'rgb(255 255 255 / 0.85)',
 } as const
 
 /**
- * Draws the sphere pool and its contents.
+ * Draws the sphere pool and everything in it.
  *
- * Everything is drawn in world units: `draw` installs a transform that maps the
- * pool onto the canvas, so geometry here matches `core/pitch` exactly and no
- * call site needs to convert coordinates. Line widths are therefore also in
- * world units.
+ * Play is drawn in world units: `draw` installs a transform mapping the pool
+ * onto the canvas, so geometry here matches `core/pitch` exactly and no call
+ * site converts coordinates. Line widths and font sizes are world units too.
+ * The scoreboard is drawn afterwards in screen space so it stays a fixed size.
  */
 export class Renderer {
   private readonly ctx: CanvasRenderingContext2D
@@ -70,7 +73,17 @@ export class Renderer {
     this.drawMarkings()
     this.drawGoal('left')
     this.drawGoal('right')
+
+    // Keepers first so outfielders overlap them, not the other way round.
+    for (const player of state.players) {
+      if (player.slot === 'GK') this.drawPlayer(state, player, alpha)
+    }
+    for (const player of state.players) {
+      if (player.slot !== 'GK') this.drawPlayer(state, player, alpha)
+    }
+
     this.drawBall(state, alpha)
+    this.drawScoreboard(state, dpr)
   }
 
   private drawWater(): void {
@@ -121,7 +134,6 @@ export class Renderer {
     ctx.strokeStyle = COLOURS.goal
     ctx.lineWidth = 0.5
 
-    // Goal mouth.
     ctx.beginPath()
     ctx.moveTo(x, -GOAL_HALF_HEIGHT)
     ctx.lineTo(x, GOAL_HALF_HEIGHT)
@@ -146,10 +158,50 @@ export class Renderer {
     }
   }
 
+  private drawPlayer(state: MatchState, player: Player, alpha: number): void {
+    const { ctx } = this
+    const x = player.prevX + (player.x - player.prevX) * alpha
+    const y = player.prevY + (player.y - player.prevY) * alpha
+    const { colours } = state.teams[player.team].def
+    const isControlled = player.id === state.controlled
+    const hasBall = state.ball.carrier === player.id
+
+    if (isControlled) {
+      ctx.beginPath()
+      ctx.arc(x, y, PLAYER_RADIUS + 1.3, 0, Math.PI * 2)
+      ctx.strokeStyle = COLOURS.controlRing
+      ctx.lineWidth = 0.4
+      ctx.stroke()
+    }
+
+    ctx.beginPath()
+    ctx.arc(x, y, PLAYER_RADIUS, 0, Math.PI * 2)
+    ctx.fillStyle = colours.primary
+    if (hasBall) {
+      ctx.shadowColor = colours.primary
+      ctx.shadowBlur = 14
+    }
+    ctx.fill()
+    ctx.shadowBlur = 0
+
+    ctx.lineWidth = player.slot === 'GK' ? 0.7 : 0.4
+    ctx.strokeStyle = colours.secondary
+    ctx.stroke()
+
+    ctx.font = '2.2px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = colours.secondary
+    ctx.fillText(player.slot, x, y)
+
+    ctx.font = '2.1px ui-sans-serif, system-ui, sans-serif'
+    ctx.fillStyle = COLOURS.label
+    ctx.fillText(player.def.name, x, y + PLAYER_RADIUS + 2.2)
+  }
+
   private drawBall(state: MatchState, alpha: number): void {
     const { ctx } = this
     const { ball } = state
-    // Interpolate between the last two ticks so motion is smooth at any refresh rate.
     const x = ball.prevX + (ball.x - ball.prevX) * alpha
     const y = ball.prevY + (ball.y - ball.prevY) * alpha
 
@@ -160,5 +212,38 @@ export class Renderer {
     ctx.shadowBlur = 16
     ctx.fill()
     ctx.shadowBlur = 0
+  }
+
+  /** Screen-space scoreboard, so it keeps a constant size regardless of zoom. */
+  private drawScoreboard(state: MatchState, dpr: number): void {
+    const { ctx } = this
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+    const { home, away } = state.teams
+    const minutes = Math.floor(state.elapsed / 60)
+    const seconds = Math.floor(state.elapsed % 60)
+    const clock = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+    ctx.font = '600 18px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+
+    const centre = this.width / 2
+    ctx.fillStyle = home.def.colours.primary
+    ctx.textAlign = 'right'
+    ctx.fillText(`${home.def.abbreviation} ${home.score}`, centre - 22, 18)
+
+    ctx.fillStyle = 'rgb(255 255 255 / 0.5)'
+    ctx.textAlign = 'center'
+    ctx.fillText('–', centre, 18)
+
+    ctx.fillStyle = away.def.colours.primary
+    ctx.textAlign = 'left'
+    ctx.fillText(`${away.score} ${away.def.abbreviation}`, centre + 22, 18)
+
+    ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.fillStyle = 'rgb(255 255 255 / 0.45)'
+    ctx.textAlign = 'center'
+    ctx.fillText(clock, centre, 42)
   }
 }
