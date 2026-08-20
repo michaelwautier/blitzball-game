@@ -241,11 +241,11 @@ describe('encounter input', () => {
     state.phase = {
       kind: 'encounter',
       encounter: {
+        kind: 'contested',
         carrierId: carrier.id,
         defenders: [{ id: 'home:letty', attack: 9 }],
         endurance: 10,
         thinkTimer: 5,
-        passOnly: false,
       },
     }
     expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null })).toBe(false)
@@ -258,11 +258,11 @@ describe('encounter input', () => {
     state.phase = {
       kind: 'encounter',
       encounter: {
+        kind: 'contested',
         carrierId: carrier.id,
         defenders: [{ id: 'away:doram', attack: 9 }],
         endurance: 100,
         thinkTimer: 0,
-        passOnly: false,
       },
     }
     expect(submitEncounterAction(state, { kind: 'breakthrough' })).toBe(true)

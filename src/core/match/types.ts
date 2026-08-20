@@ -64,18 +64,24 @@ export interface EncounterResult {
  * A carrier caught by defenders. Play freezes until the action is chosen, which
  * is where blitzball stops being a swimming game and becomes a stat contest.
  */
+/**
+ * Why the decision is open, which determines what may be chosen.
+ *
+ * - `contested`: defenders have closed the carrier down. Everything is legal.
+ * - `onTheBall`: the carrier chose to stop and look up. Nobody is on them, so
+ *   there is nothing to break through — pass or shoot.
+ * - `distribution`: a keeper restarting play. Passing only.
+ */
+export type EncounterKind = 'contested' | 'onTheBall' | 'distribution'
+
 export interface Encounter {
+  kind: EncounterKind
   carrierId: string
   defenders: EncounterDefender[]
   /** Endurance the carrier brings into this exchange. */
   endurance: number
   /** Delay before an AI carrier commits, so its choice is readable. */
   thinkTimer: number
-  /**
-   * Passing is the only legal action. Set for a keeper restarting play, who
-   * distributes from the line rather than dribbling or shooting.
-   */
-  passOnly: boolean
 }
 
 /** A pass or shot travelling, still liable to be contested. */

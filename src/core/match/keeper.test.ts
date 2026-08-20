@@ -26,7 +26,7 @@ describe('a keeper on the ball', () => {
     expect(state.phase.kind).toBe('encounter')
     if (state.phase.kind === 'encounter') {
       expect(state.phase.encounter.carrierId).toBe(keeper.id)
-      expect(state.phase.encounter.passOnly).toBe(true)
+      expect(state.phase.encounter.kind).toBe('distribution')
       expect(state.phase.encounter.defenders).toEqual([])
     }
   })

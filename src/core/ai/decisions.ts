@@ -51,11 +51,12 @@ export function chooseEncounterAction(
   const carrier = playerById(state, encounter.carrierId)
   if (!carrier) return { kind: 'breakthrough' }
 
-  if (encounter.passOnly) return chooseDistribution(state, carrier)
+  if (encounter.kind === 'distribution') return chooseDistribution(state, carrier)
 
   const goalDistance = distanceToOpposingGoal(state, carrier)
   const incoming = encounter.defenders.reduce((total, d) => total + d.attack, 0)
-  const canBreakThrough = encounter.endurance - incoming > BREAKTHROUGH_MARGIN
+  const canBreakThrough =
+    encounter.kind === 'contested' && encounter.endurance - incoming > BREAKTHROUGH_MARGIN
 
   if (isShotWorthTaking(state, carrier, goalDistance)) {
     return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
@@ -73,7 +74,7 @@ export function chooseEncounterAction(
   // calculated we lose just hands the ball over. Without this fallback a team
   // whose best shooter cannot clear the opposing keeper's catching never shoots
   // at all, at any range, for the entire match.
-  if (goalDistance <= DESPERATION_RANGE) {
+  if (goalDistance <= DESPERATION_RANGE || encounter.kind !== 'contested') {
     return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
   }
 

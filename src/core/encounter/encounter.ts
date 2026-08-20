@@ -5,6 +5,7 @@ import { startPass, startShot } from '../match/flight'
 import type {
   Encounter,
   EncounterAction,
+  EncounterKind,
   EncounterResult,
   MatchState,
   Player,
@@ -72,9 +73,37 @@ export function openEncounter(
       id: d.id,
       attack: rollStat(effectiveStat(d, 'at'), state.rng),
     })),
+    kind: 'contested',
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
-    passOnly: false,
+  }
+}
+
+/**
+ * The carrier stops and looks up of their own accord.
+ *
+ * No defender has committed, so there is nothing to break past: the choice is
+ * simply who to find, or whether to take it on themselves.
+ */
+export function openOnTheBall(state: MatchState, carrier: Player): Encounter {
+  return {
+    kind: 'onTheBall',
+    carrierId: carrier.id,
+    defenders: [],
+    endurance: state.endurance,
+    thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+  }
+}
+
+/** Which actions this kind of decision permits. */
+export function allowedActions(kind: EncounterKind): EncounterAction['kind'][] {
+  switch (kind) {
+    case 'contested':
+      return ['breakthrough', 'pass', 'shoot']
+    case 'onTheBall':
+      return ['pass', 'shoot']
+    case 'distribution':
+      return ['pass']
   }
 }
 
@@ -87,11 +116,11 @@ export function openEncounter(
  */
 export function openDistribution(state: MatchState, keeper: Player): Encounter {
   return {
+    kind: 'distribution',
     carrierId: keeper.id,
     defenders: [],
     endurance: state.endurance,
     thinkTimer: keeper.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
-    passOnly: true,
   }
 }
 
@@ -112,10 +141,18 @@ export function resolveEncounter(
     return { action: action.kind, success: false, summary: 'Possession lost' }
   }
 
-  // A keeper on the ball may only pass; anything else is quietly refused rather
-  // than half-applied, so a stray input cannot walk a goalkeeper up the pool.
-  if (encounter.passOnly && action.kind !== 'pass') {
-    return { action: action.kind, success: false, summary: `${carrier.def.name} must find a teammate` }
+  // Anything the decision does not permit is refused outright rather than
+  // half-applied, so no stray input can dribble a goalkeeper up the pool or
+  // barge past defenders who were never there.
+  if (!allowedActions(encounter.kind).includes(action.kind)) {
+    return {
+      action: action.kind,
+      success: false,
+      summary:
+        encounter.kind === 'distribution'
+          ? `${carrier.def.name} must find a teammate`
+          : `${carrier.def.name} cannot do that here`,
+    }
   }
 
   switch (action.kind) {
