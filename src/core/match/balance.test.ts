@@ -4,9 +4,14 @@ import {
   createMatch,
   requestActionMenu,
   stepMatch,
+  submitDefence,
   submitEncounterAction,
 } from './state'
-import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
+import {
+  chooseEncounterAction,
+  chooseTackleTechnique,
+  shouldStopAndShoot,
+} from '../ai/decisions'
 import { autoIntent } from '../ai/autopilot'
 import { USER_TEAM } from './types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
@@ -51,6 +56,10 @@ function simulateMatch(seed: string, homeTeam = BESAID_AUROCHS): MatchReport {
       shouldStopAndShoot(state, onBall)
     ) {
       requestActionMenu(state)
+    }
+
+    if (state.phase.kind === 'encounter' && state.phase.encounter.awaitingDefence) {
+      submitDefence(state, chooseTackleTechnique(state, state.phase.encounter))
     }
 
     if (state.phase.kind === 'encounter') {

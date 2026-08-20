@@ -2,9 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { Squad } from './squad'
 import { currentStats, expForNextLevel } from './career'
 import { EXP_AWARDS } from './awards'
-import { createMatch, requestActionMenu, stepMatch, submitEncounterAction } from '../match/state'
+import {
+  createMatch,
+  requestActionMenu,
+  stepMatch,
+  submitDefence,
+  submitEncounterAction,
+} from '../match/state'
 import { awardExp } from '../match/exp'
-import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
+import {
+  chooseEncounterAction,
+  chooseTackleTechnique,
+  shouldStopAndShoot,
+} from '../ai/decisions'
 import { autoIntent } from '../ai/autopilot'
 import { HALF_SECONDS } from '../match/state'
 import { USER_TEAM, type MatchState } from '../match/types'
@@ -30,6 +40,10 @@ function playOut(state: MatchState): void {
       shouldStopAndShoot(state, onBall)
     ) {
       requestActionMenu(state)
+    }
+
+    if (state.phase.kind === 'encounter' && state.phase.encounter.awaitingDefence) {
+      submitDefence(state, chooseTackleTechnique(state, state.phase.encounter))
     }
 
     if (state.phase.kind === 'encounter') {

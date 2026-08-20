@@ -137,6 +137,8 @@ describe('backing out', () => {
         defenders: [{ id: 'away:doram', attack: 9, block: 5 }],
         endurance: 10,
         thinkTimer: 0,
+        awaitingDefence: false,
+        defence: null,
       },
     }
 

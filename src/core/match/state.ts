@@ -383,6 +383,9 @@ function stepEncounter(state: MatchState, dt: number, encounter: Encounter): voi
     return
   }
 
+  // The carrier does not commit until the defence has said how it is coming.
+  if (encounter.awaitingDefence) return
+
   if (carrier.team === USER_TEAM) return
 
   encounter.thinkTimer -= dt
@@ -427,6 +430,24 @@ export function cancelActionMenu(state: MatchState): boolean {
 }
 
 /**
+ * Commit how the user's defenders are challenging.
+ *
+ * `techniqueId` of null is a plain tackle. Answering releases the carrier to
+ * make their own decision, which is why the encounter waits on this rather than
+ * resolving around it.
+ */
+export function submitDefence(state: MatchState, techniqueId: string | null): boolean {
+  if (state.phase.kind !== 'encounter') return false
+
+  const { encounter } = state.phase
+  if (!encounter.awaitingDefence) return false
+
+  encounter.defence = { techniqueId }
+  encounter.awaitingDefence = false
+  return true
+}
+
+/**
  * Commit the user's choice. Ignored unless an encounter is genuinely open on a
  * player they control, so a stray click cannot act out of turn.
  */
@@ -436,6 +457,8 @@ export function submitEncounterAction(state: MatchState, action: EncounterAction
   const { encounter } = state.phase
   const carrier = carrierOf(state)
   if (!carrier || carrier.id !== encounter.carrierId || carrier.team !== USER_TEAM) return false
+  // Their own defenders are still deciding; nothing to commit on the ball.
+  if (encounter.awaitingDefence) return false
 
   applyEncounterAction(state, encounter, action)
   return true

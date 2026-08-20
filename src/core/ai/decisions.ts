@@ -1,6 +1,11 @@
 import { GOAL_HALF_HEIGHT, POOL_RADIUS, goalLineX } from '../pitch'
 import { ACTION_HP_COST, SHOT_DECAY_PER_UNIT, rollBounds } from '../encounter/formulas'
-import { ENGAGE_RADIUS, blockRange, tackleRange } from '../encounter/encounter'
+import {
+  ENGAGE_RADIUS,
+  blockRange,
+  defensiveTechniques,
+  tackleRange,
+} from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
 import {
   distanceBetween,
@@ -337,4 +342,16 @@ export function chooseBreakPast(
 
   // Cannot clear enough to make the throw worth more; keep the endurance.
   return 0
+}
+
+/**
+ * Which tackle technique the defence brings, when nobody is there to choose.
+ *
+ * Takes the strongest condition it can afford — the point of a tackle technique
+ * is what it leaves behind on the player it dispossesses, so there is little
+ * reason to hold one back.
+ */
+export function chooseTackleTechnique(state: MatchState, encounter: Encounter): string | null {
+  const available = defensiveTechniques(state, encounter)
+  return available[0]?.id ?? null
 }

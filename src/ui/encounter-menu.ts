@@ -1,5 +1,10 @@
 import { isCovered } from '../core/ai/decisions'
-import { allowedActions, blockRange, tackleRange } from '../core/encounter/encounter'
+import {
+  allowedActions,
+  blockRange,
+  defensiveTechniques,
+  tackleRange,
+} from '../core/encounter/encounter'
 import { ACTION_HP_COST } from '../core/encounter/formulas'
 import { distanceBetween, outfieldTeammates, playerById } from '../core/match/queries'
 import { canAfford } from '../core/match/stats'
@@ -12,14 +17,18 @@ import {
 } from '../core/match/state'
 import { techniquesOf, type Technique } from '../data/techniques'
 
-type Mode = 'actions' | 'passTargets' | 'breakPast' | 'passTechnique' | 'shootTechnique'
+type Mode = 'defence' | 'actions' | 'passTargets' | 'breakPast' | 'passTechnique' | 'shootTechnique'
 
 interface Row {
   label: string
   detail: string
   tone: 'safe' | 'risky' | 'neutral'
   /** What choosing it does: commit an action, open a further step, or back out. */
-  effect: { commit: EncounterAction } | { open: Mode } | { cancel: true }
+  effect:
+    | { commit: EncounterAction }
+    | { open: Mode }
+    | { cancel: true }
+    | { defend: string | null }
   /** Set on pass-target rows, so the receiver survives the steps that follow. */
   targetId?: string
   /** Set on break-past rows, so the count survives the technique step. */
@@ -31,6 +40,8 @@ interface Row {
 
 export interface EncounterMenuHandlers {
   onAction: (action: EncounterAction) => void
+  /** Commit how the user's defenders are challenging. Null is a plain tackle. */
+  onDefend: (techniqueId: string | null) => void
   /** Back out of a decision the user opened themselves. */
   onCancel: () => void
 }
@@ -75,9 +86,20 @@ export class EncounterMenu {
       return
     }
 
-    // Opening fresh: start at the target list when passing is the only choice.
+    // Opening fresh: defending comes first when it is being asked, then the
+    // target list if passing is the only thing on offer.
     if (this.element.hidden) {
-      this.mode = state.phase.encounter.kind === 'distribution' ? 'passTargets' : 'actions'
+      this.mode = state.phase.encounter.awaitingDefence
+        ? 'defence'
+        : state.phase.encounter.kind === 'distribution'
+          ? 'passTargets'
+          : 'actions'
+    }
+
+    // The defence answering hands the encounter over to the carrier.
+    if (this.mode === 'defence' && !state.phase.encounter.awaitingDefence) {
+      this.mode = 'actions'
+      this.signature = ''
     }
 
     const signature = this.signatureFor(state)
@@ -93,9 +115,14 @@ export class EncounterMenu {
     window.removeEventListener('keydown', this.onKeyDown)
   }
 
-  /** Only open for a decision on a player the user actually controls. */
+  /**
+   * Open for either side of an encounter: the user's own carrier deciding what
+   * to do, or the user's defenders deciding how to challenge.
+   */
   private isOpenFor(state: MatchState): boolean {
     if (state.phase.kind !== 'encounter') return false
+    if (state.phase.encounter.awaitingDefence) return true
+
     const carrier = playerById(state, state.phase.encounter.carrierId)
     return carrier?.team === USER_TEAM
   }
@@ -106,6 +133,7 @@ export class EncounterMenu {
     return [
       this.mode,
       encounter.kind,
+      String(encounter.awaitingDefence),
       this.pendingTargetId ?? '',
       this.pendingBreakPast,
       encounter.carrierId,
@@ -157,8 +185,9 @@ export class EncounterMenu {
 
     const heading = document.createElement('div')
     heading.className = 'enc-heading'
-    heading.textContent =
-      encounter.kind === 'contested'
+    heading.textContent = encounter.awaitingDefence
+      ? `${carrier.def.name} is coming through — how do you challenge?`
+      : encounter.kind === 'contested'
         ? `${carrier.def.name} is caught by ${names}`
         : `${carrier.def.name} has it — find a teammate`
 
@@ -196,6 +225,8 @@ export class EncounterMenu {
 
   private buildRows(state: MatchState, carrier: Player, encounter: Encounter): Row[] {
     switch (this.mode) {
+      case 'defence':
+        return this.defenceRows(state, encounter)
       case 'passTargets':
         return this.passTargetRows(state, carrier)
       case 'breakPast':
@@ -207,6 +238,33 @@ export class EncounterMenu {
       case 'actions':
         return this.actionRows(carrier, encounter)
     }
+  }
+
+  /**
+   * How the user's defenders are coming in.
+   *
+   * The choice is made before any of the rolls, so it may well land on a
+   * different defender than the one who ends up winning the ball. That is the
+   * honest shape of it: you commit the defence, then find out who got there.
+   */
+  private defenceRows(state: MatchState, encounter: Encounter): Row[] {
+    const plain: Row = {
+      label: 'Tackle',
+      detail: 'Win it back and leave it at that',
+      tone: 'neutral',
+      effect: { defend: null },
+      enabled: true,
+    }
+
+    const techniques = defensiveTechniques(state, encounter).map((technique) => ({
+      label: technique.name,
+      detail: `${technique.hpCost} HP · ${technique.description}`,
+      tone: 'safe' as const,
+      effect: { defend: technique.id },
+      enabled: true,
+    }))
+
+    return [plain, ...techniques]
   }
 
   /** Built from what the engine permits, so the two cannot disagree. */
@@ -420,6 +478,8 @@ export class EncounterMenu {
    * contested carrier and a keeper are both committed.
    */
   private canGoBack(): boolean {
+    // The defence has to answer; there is no declining to be run at.
+    if (this.mode === 'defence') return false
     if (this.mode === 'actions') return this.encounterKind === 'onTheBall'
     return !(this.mode === 'passTargets' && this.encounterKind === 'distribution')
   }
@@ -486,6 +546,11 @@ export class EncounterMenu {
     if (row.throwKind) this.pendingThrow = row.throwKind
     if (row.targetId) this.pendingTargetId = row.targetId
     if (row.breakPast !== undefined) this.pendingBreakPast = row.breakPast
+
+    if ('defend' in row.effect) {
+      this.handlers.onDefend(row.effect.defend)
+      return
+    }
 
     if ('cancel' in row.effect) {
       this.handlers.onCancel()
