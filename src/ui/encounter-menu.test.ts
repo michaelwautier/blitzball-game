@@ -185,6 +185,47 @@ describe('choosing an action', () => {
   })
 })
 
+describe('the pass target list', () => {
+  it('puts the nearest teammate first', () => {
+    const state = openMenu('contested')
+    const carrier = find(state, 'home:wakka')
+
+    // Spread the side out at known distances from the passer.
+    const spread: [string, number][] = [
+      ['home:tidus', 30],
+      ['home:letty', 10],
+      ['home:jassu', 50],
+      ['home:datto', 20],
+    ]
+    for (const [id, distance] of spread) {
+      const mate = find(state, id)
+      mate.x = carrier.x + distance
+      mate.y = carrier.y
+    }
+    menu.update(state)
+
+    press('2')
+    const order = labels()
+    // Nearest first, so the safest ball is at the top of the list.
+    expect(order.indexOf('Letty')).toBeLessThan(order.indexOf('Datto'))
+    expect(order.indexOf('Datto')).toBeLessThan(order.indexOf('Tidus'))
+    expect(order.indexOf('Tidus')).toBeLessThan(order.indexOf('Jassu'))
+  })
+
+  it('shows each teammate s distance alongside them', () => {
+    const state = openMenu('contested')
+    const carrier = find(state, 'home:wakka')
+    const mate = find(state, 'home:letty')
+    mate.x = carrier.x + 25
+    mate.y = carrier.y
+    menu.update(state)
+
+    press('2')
+    const row = labels().indexOf('Letty')
+    expect(details()[row]).toContain('25m')
+  })
+})
+
 describe('the technique step', () => {
   it('lists the plain action first, then what the player knows', () => {
     openMenu('contested')

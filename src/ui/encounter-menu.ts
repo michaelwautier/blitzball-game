@@ -1,4 +1,4 @@
-import { distanceToOpposingGoal, isCovered } from '../core/ai/decisions'
+import { isCovered } from '../core/ai/decisions'
 import { allowedActions, tackleRange } from '../core/encounter/encounter'
 import { ACTION_HP_COST } from '../core/encounter/formulas'
 import { distanceBetween, outfieldTeammates, playerById } from '../core/match/queries'
@@ -255,8 +255,11 @@ export class EncounterMenu {
   private passTargetRows(state: MatchState, carrier: Player): Row[] {
     const hasTechniques = techniquesOf(carrier.def.techniques, 'pass').length > 0
 
+    // Nearest first. A pass loses power over the distance it travels, so the
+    // top of the list is the safest ball rather than the most ambitious one, and
+    // the order matches how the risk actually rises as you read down it.
     return outfieldTeammates(state, carrier.team, carrier.id)
-      .sort((a, b) => distanceToOpposingGoal(state, a) - distanceToOpposingGoal(state, b))
+      .sort((a, b) => distanceBetween(carrier, a) - distanceBetween(carrier, b))
       .map((mate) => {
         const covered = isCovered(state, mate)
         return {
