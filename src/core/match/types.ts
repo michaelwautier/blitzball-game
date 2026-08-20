@@ -77,17 +77,24 @@ export interface TeamState {
  * option that costs nothing but endurance.
  */
 export type EncounterAction =
-  | { kind: 'breakthrough' }
-  | { kind: 'pass'; targetId: string; techniqueId: string | null; breakPast: number }
-  | { kind: 'shoot'; techniqueId: string | null; breakPast: number }
+  | { kind: 'breakthrough'; breakPast: BreakPast }
+  | { kind: 'pass'; targetId: string; techniqueId: string | null }
+  | { kind: 'shoot'; techniqueId: string | null }
 
 /**
- * How many defenders a throw takes on before it is made.
+ * How many of the defenders on the carrier a breakthrough takes on.
  *
- * FFX lets a carrier "break through as little as one to all" of the players on
- * them, and whoever is beaten no longer has their blocking counted against the
- * pass or shot that follows. It is a straight trade: endurance to clear the
- * lane, against arriving with more of the throw intact.
+ * FFX lets a carrier break through "as little as one to all" of them, nearest
+ * first. Beating everyone frees them to swim on; beating some leaves them still
+ * caught, but by fewer — and it is the survivors, and only them, whose blocking
+ * counts against whatever is thrown next.
+ *
+ * That is why breaking is a step *inside* the encounter rather than something
+ * bundled onto a pass or a shot. The trade is the same either way — endurance
+ * spent clearing the lane against arriving with more of the throw intact — but
+ * as a step it is a decision the player watches resolve before making the next
+ * one, and there is no way to slip back into open water while anyone is still
+ * on you.
  */
 export type BreakPast = number
 
@@ -110,6 +117,14 @@ export interface EncounterResult {
   success: boolean
   /** Line shown to the player, e.g. "EN 14 − AT 9 = 5 · broke through". */
   summary: string
+  /**
+   * The encounter is not over: defenders were beaten, but not all of them.
+   *
+   * The carrier stays caught and decides again, now against fewer. Only a
+   * breakthrough that clears everyone — or a throw, which leaves by way of the
+   * ball — ends an encounter.
+   */
+  continues?: boolean
 }
 
 /**

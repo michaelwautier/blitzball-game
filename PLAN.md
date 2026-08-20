@@ -152,15 +152,15 @@ against the ladder alone.
    ball — the scorer winning that race half the time was a compounding unfairness, since play
    clusters wherever the ball lands. Each half still opens with the neutral scatter, which is
    the blitzoff. It compressed the extremes as intended: see *Balance*.
-3. **The FFX breakthrough flow.** Breaking past defenders becomes a *step inside* the
+3. **The FFX breakthrough flow** ✅ (#33). Breaking past defenders is a *step inside* the
    encounter rather than a bundle on the throw: `breakthrough` takes a depth (challenge the
    nearest k), clearing everyone resumes play, clearing some keeps the encounter open against
-   the rest — who then block the throw. Pass and shoot lose their bundled break-past and go
-   straight to target/technique. There is no route back to open play while a defender is
-   still engaged (already true — cancel only works on a voluntary stop — and pinned by test).
-   The AI gets two-step play for free by re-deciding each think-tick. Ladder-measured: the HP
-   economy shifts (two action costs where the bundle paid one), and a cheap partial break must
-   not become dominant.
+   the rest — who alone block whatever is thrown next. Pass and shoot lost their bundled
+   break-past and go straight to target/technique, so the menu has fewer steps than before.
+   There is no route back to open play while a defender is still engaged. The AI gets two-step
+   play for free by re-deciding each think-tick. Measured: scoring held at 2.4 goals a match
+   and breaking did not become dominant (12.2 breaks against 20.6 shots a match), though the
+   already-thin tails thinned further — see issue #25.
 4. **Top-right stat stack, and HP drains while carrying.** The FFX panel: the carrier's name
    and effective `HP EN PA SH` always (either team's), plus one row per engaged defender
    (`HP AT BL`, from the encounter's own snapshot — the numbers actually rolled) during
@@ -171,6 +171,19 @@ against the ladder alone.
    mechanism) into a line between the attacker and their goal when the encounter opens, and
    the camera dollies toward the tableau while the menu is up. Mostly presentation, but the
    staged positions are live when play resumes, so it gets a ladder sample too.
+6. **Arrow-key selection.** Move through the encounter options with the arrow keys and confirm
+   with space or enter, rather than hitting the number of the row. The number keys stay as a
+   shortcut. UI only.
+7. **Make defending feel like defending.** `engageCooldown` is a single global timer, so every
+   reception and every completed throw blacks out *all* encounters for four seconds — and on
+   top of that, attacking has an override that defending does not: `requestActionMenu` (the
+   space bar) never checks the cooldown, so a carrier can stop and think whenever they like
+   while a defender can only wait. The result is being glued to an opponent for seconds with
+   no way to challenge. The fix is not to lower the constant, which would undo #24's work, but
+   to make the cooldown per-defender — beaten defenders already recover individually through
+   `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
+   challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
+   what #24 spent its effort on.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
@@ -219,9 +232,15 @@ The most sensitive numbers, in order: `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT`
 blocker coverage weights. Small moves in any of them swing the whole board — change one at a
 time and re-run the ladder.
 
-Known tail, tracked as issue **#25**: Kilika and the Guado barely score, and the Guado went a
+Two known problems live in the issue tracker rather than in this file. **#25**: Kilika and the Guado barely score, and the Guado went a
 full simulated season without a single goal. It is faithful to the data — neither side has a
 shooter, and the Guado have no shot techniques at all — so it is filed rather than tuned away.
+**#32** is worse: the two ends of the pool are not worth the same. Over sixty mirror matches
+Luca win 17 and lose 38 at the home end while Besaid win 49 and lose 6 at that same end. It
+predates any of Phase 5 and may be an artefact of how `simulateMatch` drives the user's side
+differently from the engine's, rather than a fault in the game itself — that is the first
+thing to establish. The league and the ladder both play every pairing at each end, so neither
+the table nor the tuning conclusions are invalidated.
 
 ## True volumetric 3D, if it is ever wanted
 

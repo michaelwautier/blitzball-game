@@ -6,6 +6,7 @@ import { findPlayer } from '../../data/teams'
 import { desiredPosition } from '../ai/positioning'
 import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
 import {
+  AI_THINK_SECONDS,
   engagingDefenders,
   openDistribution,
   openEncounter,
@@ -514,6 +515,13 @@ function applyEncounterAction(
 ): void {
   const result = resolveEncounter(state, encounter, action)
   announce(state, result.summary)
+
+  // Past some of them but not all: still caught, and deciding again against
+  // whoever is left. An AI carrier takes another moment to think about it.
+  if (result.continues && state.phase.kind === 'encounter') {
+    encounter.thinkTimer = AI_THINK_SECONDS
+    return
+  }
 
   // Pass and shoot move to a flight themselves; anything else resumes open play.
   if (state.phase.kind === 'encounter') state.phase = { kind: 'play' }

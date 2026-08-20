@@ -81,7 +81,7 @@ export function chooseEncounterAction(
   encounter: Encounter,
 ): EncounterAction {
   const carrier = playerById(state, encounter.carrierId)
-  if (!carrier) return { kind: 'breakthrough' }
+  if (!carrier) return { kind: 'breakthrough', breakPast: 1 }
 
   if (encounter.kind === 'distribution') return chooseDistribution(state, carrier)
 
@@ -93,24 +93,40 @@ export function chooseEncounterAction(
   const canBreakThrough =
     encounter.kind === 'contested' && encounter.endurance - expected > BREAKTHROUGH_MARGIN
 
-  if (isShotWorthTaking(state, carrier, goalDistance, encounter)) {
-    return {
-      kind: 'shoot',
-      techniqueId: chooseTechnique(carrier, 'shoot'),
-      breakPast: chooseBreakPast(encounter, carrier, 'sh'),
-    }
+  /**
+   * Clear a lane before throwing, if that is what the throw needs.
+   *
+   * Breaking is a step of its own now, so this returns a breakthrough to be made
+   * *this* decision — the throw follows on the next one, against whoever is
+   * left. Returning nothing means throw now.
+   */
+  const clearFirst = (stat: 'pa' | 'sh'): EncounterAction | undefined => {
+    const count = chooseBreakPast(encounter, carrier, stat)
+    return count > 0 ? { kind: 'breakthrough', breakPast: count } : undefined
   }
 
-  if (canBreakThrough) return { kind: 'breakthrough' }
+  if (isShotWorthTaking(state, carrier, goalDistance, encounter)) {
+    return (
+      clearFirst('sh') ?? {
+        kind: 'shoot',
+        techniqueId: chooseTechnique(carrier, 'shoot'),
+      }
+    )
+  }
+
+  if (canBreakThrough) {
+    return { kind: 'breakthrough', breakPast: encounter.defenders.length }
+  }
 
   const receiver = bestPassTarget(state, carrier)
   if (receiver) {
-    return {
-      kind: 'pass',
-      targetId: receiver.id,
-      techniqueId: chooseTechnique(carrier, 'pass'),
-      breakPast: chooseBreakPast(encounter, carrier, 'pa'),
-    }
+    return (
+      clearFirst('pa') ?? {
+        kind: 'pass',
+        targetId: receiver.id,
+        techniqueId: chooseTechnique(carrier, 'pass'),
+      }
+    )
   }
 
   // Cornered: no shot on, not enough endurance, nobody to find. A speculative
@@ -119,14 +135,15 @@ export function chooseEncounterAction(
   // whose best shooter cannot clear the opposing keeper's catching never shoots
   // at all, at any range, for the entire match.
   if (goalDistance <= DESPERATION_RANGE || encounter.kind !== 'contested') {
-    return {
-      kind: 'shoot',
-      techniqueId: chooseTechnique(carrier, 'shoot'),
-      breakPast: chooseBreakPast(encounter, carrier, 'sh'),
-    }
+    return (
+      clearFirst('sh') ?? {
+        kind: 'shoot',
+        techniqueId: chooseTechnique(carrier, 'shoot'),
+      }
+    )
   }
 
-  return { kind: 'breakthrough' }
+  return { kind: 'breakthrough', breakPast: encounter.defenders.length }
 }
 
 /**
@@ -294,8 +311,6 @@ export function chooseDistribution(state: MatchState, keeper: Player): Encounter
     kind: 'pass',
     targetId: receiver?.id ?? '',
     techniqueId: receiver ? chooseTechnique(keeper, 'pass') : null,
-    // A keeper has nobody on them; there is nothing to clear.
-    breakPast: 0,
   }
 }
 

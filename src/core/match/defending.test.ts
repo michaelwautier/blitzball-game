@@ -99,7 +99,7 @@ describe('being run at', () => {
     runAtUs(state, ['home:letty'])
     stepMatch(state, TICK)
 
-    expect(submitEncounterAction(state, { kind: 'breakthrough' })).toBe(false)
+    expect(submitEncounterAction(state, { kind: 'breakthrough', breakPast: 2 })).toBe(false)
   })
 
   it('ignores an answer when nothing is being asked', () => {
@@ -170,7 +170,7 @@ describe('the chosen tackle', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     expect(result.success).toBe(false)
     expect(result.summary).toContain('Venom Tackle')
@@ -187,7 +187,7 @@ describe('the chosen tackle', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     expect(result.summary).not.toContain('Venom Tackle')
     expect(hasStatus(carrier, 'poison')).toBe(false)
@@ -202,7 +202,7 @@ describe('the chosen tackle', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     // A plain tackle is a real choice, not a fallback to whatever they know.
     expect(hasStatus(carrier, 'poison')).toBe(false)
   })
@@ -229,7 +229,7 @@ describe('when the AI defends', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     // Doram knows Venom Tackle and nobody had to pick it for him.
     expect(result.summary).toContain('Venom Tackle')
   })

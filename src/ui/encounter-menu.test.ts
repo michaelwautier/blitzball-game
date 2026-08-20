@@ -160,16 +160,25 @@ describe('what each kind of decision offers', () => {
 })
 
 describe('choosing an action', () => {
-  it('commits a breakthrough by key', () => {
+  it('asks how many to break past rather than barging blindly', () => {
     openMenu('contested')
     press('1')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough' })
+    expect(onAction).not.toHaveBeenCalled()
+    expect(labels()).toEqual(['No Break', 'Break to Doram'])
+  })
+
+  it('commits a breakthrough by key', () => {
+    openMenu('contested', 'home:wakka', 40)
+    press('1')
+    press('2')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
   it('commits a breakthrough by click', () => {
-    openMenu('contested')
+    openMenu('contested', 'home:wakka', 40)
     click(0)
-    expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough' })
+    click(1)
+    expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
   it('ignores a key with no row behind it', () => {
@@ -241,13 +250,12 @@ describe('the pass target list', () => {
   })
 })
 
-describe('choosing how many to get past', () => {
-  it('offers every count from nobody up to all of them', () => {
+describe('choosing how many to break past', () => {
+  it('offers standing pat, then each defender in turn', () => {
     openMenu('contested')
-    press('3')
-    // One defender in the fixture, so: throw through them, or break past them.
-    // FFX names the defender rather than counting, which is only possible
-    // because at most two ever engage.
+    press('1')
+    // One defender in the fixture. FFX names them rather than counting, which
+    // is only possible because at most two ever engage.
     expect(labels()).toEqual(['No Break', 'Break to Doram'])
   })
 
@@ -259,37 +267,54 @@ describe('choosing how many to get past', () => {
       { id: 'away:balgerda', attack: 9, block: 8 },
     ]
     menu.update(state)
-    press('3')
+    press('1')
 
     // Breaking to the second means going through the first as well.
     expect(labels()).toEqual(['No Break', 'Break to Doram', 'Break to Doram & Balgerda'])
   })
 
-  it('shows what clearing them costs and what it buys', () => {
-    openMenu('contested')
-    press('3')
-
-    const through = details()[0]!
-    const past = details()[1]!
-    // Not breaking faces their blocking; breaking costs endurance and leaves
-    // nothing in the way.
-    expect(through).toMatch(/BL \d+–\d+/)
-    expect(through).not.toContain('EN')
-    expect(past).toContain('costs EN')
-    expect(past).toContain('BL 0–0')
+  it('commits the break at the depth chosen', () => {
+    openMenu('contested', 'home:wakka', 40)
+    press('1')
+    press('2')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
-  it('will not offer a challenge the carrier cannot survive', () => {
+  it('shows what a break costs, and what is left facing the carrier', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    state.phase.encounter.defenders = [
+      { id: 'away:doram', attack: 11, block: 5 },
+      { id: 'away:balgerda', attack: 9, block: 8 },
+    ]
+    menu.update(state)
+    press('1')
+
+    // Beating one leaves the other still blocking; beating both frees them.
+    expect(details()[1]).toContain('costs EN')
+    expect(details()[1]).toMatch(/still facing BL \d+–\d+/)
+    expect(details()[2]).toContain('free to swim on')
+  })
+
+  it('will not offer a challenge the carrier cannot survive at all', () => {
     // Endurance below even the best case of the tackle waiting for them.
     openMenu('contested', 'home:wakka', 2)
-    press('3')
+    press('1')
     expect(buttons()[1]!.disabled).toBe(true)
   })
 
   it('offers it when there is endurance to spare', () => {
     openMenu('contested', 'home:wakka', 40)
-    press('3')
+    press('1')
     expect(buttons()[1]!.disabled).toBe(false)
+  })
+
+  it('backs out to the action list rather than committing anything', () => {
+    openMenu('contested')
+    press('1')
+    press('1')
+    expect(onAction).not.toHaveBeenCalled()
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
   })
 })
 
@@ -297,7 +322,6 @@ describe('the technique step', () => {
   it('lists the plain action first, then what the player knows', () => {
     openMenu('contested')
     press('3')
-    press('1')
     // Wakka knows Venom Shot.
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
   })
@@ -305,7 +329,6 @@ describe('the technique step', () => {
   it('prices each option in HP', () => {
     openMenu('contested')
     press('3')
-    press('1')
     const venom = findTechnique('venom-shot')
     expect(details()[0]).toContain(`${ACTION_HP_COST.shoot} HP`)
     expect(details()[1]).toContain(`${ACTION_HP_COST.shoot + venom.hpCost} HP`)
@@ -315,26 +338,14 @@ describe('the technique step', () => {
     openMenu('contested')
     press('3')
     press('1')
-    press('1')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 0 })
-  })
-
-  it('carries the chosen count through to the action', () => {
-    // Enough endurance that taking the defender on is actually on offer.
-    openMenu('contested', 'home:wakka', 40)
-    press('3')
-    // Get past the one defender, then shoot plainly.
-    press('2')
-    press('1')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 1 })
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
   })
 
   it('commits the technique', () => {
     openMenu('contested')
     press('3')
-    press('1')
     press('2')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot', breakPast: 0 })
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot' })
   })
 
   it('disables a technique the carrier cannot pay for', () => {
@@ -343,7 +354,6 @@ describe('the technique step', () => {
     menu.update(state)
 
     press('3')
-    press('1')
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
     expect(buttons()[1]!.disabled).toBe(true)
 
@@ -352,17 +362,16 @@ describe('the technique step', () => {
   })
 
   it('is skipped entirely for a player who knows none', () => {
-    // Letty knows only a tackle technique, so shooting has nothing to offer.
+    // Letty knows only a tackle technique, so shooting has nothing to offer
+    // and the row commits straight away.
     openMenu('contested', 'home:letty')
     press('3')
-    press('1')
-    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null, breakPast: 0 })
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
   })
 
   it('passes straight through for a player with no pass techniques', () => {
     openMenu('contested', 'home:letty')
     press('2')
-    press('1')
     press('1')
 
     expect(onAction).toHaveBeenCalledTimes(1)
@@ -380,8 +389,7 @@ describe('remembering the pass target', () => {
     // still goes to that player rather than whoever the rows were rebuilt with.
     const chosen = labels()[2]
     press('3')
-    // Then how many to get past, then the technique.
-    press('1')
+    // Then the technique, which is now the only step left.
     press('1')
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
@@ -397,7 +405,6 @@ describe('remembering the pass target', () => {
     press('2')
     const chosen = labels()[1]
     press('2')
-    press('1')
     press('2')
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
@@ -409,24 +416,64 @@ describe('remembering the pass target', () => {
   })
 })
 
+describe('after a break lands', () => {
+  it('starts the decision again from the top, against whoever is left', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    state.phase.encounter.defenders = [
+      { id: 'away:doram', attack: 11, block: 5 },
+      { id: 'away:balgerda', attack: 9, block: 8 },
+    ]
+    menu.update(state)
+
+    press('1')
+    expect(labels()).toContain('Break to Doram')
+
+    // The engine resolves the break and leaves the encounter open against one.
+    state.phase.encounter.defenders = [{ id: 'away:balgerda', attack: 9, block: 8 }]
+    menu.update(state)
+
+    // Back to the full choice: with one fewer in the way, shooting may now be on.
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+  })
+
+  it('forgets a pass target chosen before the break', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    press('2')
+    expect(labels()).toContain('Tidus')
+
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    state.phase.encounter.defenders = []
+    menu.update(state)
+
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+  })
+})
+
 describe('going back', () => {
   it('steps back through each question in turn', () => {
     openMenu('contested')
     press('2')
-    press('1')
-    expect(labels()).toContain('No Break')
+    expect(labels()).toContain('Tidus')
 
     press('1')
     expect(labels()).toContain('Straight pass')
-
-    press('Escape')
-    expect(labels()).toContain('No Break')
 
     press('Escape')
     expect(labels()).toContain('Tidus')
 
     press('Escape')
     expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+  })
+
+  it('steps back out of the break question without committing one', () => {
+    openMenu('contested')
+    press('1')
+    expect(labels()).toContain('No Break')
+
+    press('Escape')
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+    expect(onAction).not.toHaveBeenCalled()
   })
 
   it('steps from the targets back to the actions', () => {

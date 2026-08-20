@@ -169,7 +169,7 @@ describe('acting from an on-the-ball decision', () => {
     inTheClear(state)
     requestActionMenu(state)
 
-    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null, breakPast: 0 })).toBe(true)
+    expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null })).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })
 
@@ -179,7 +179,7 @@ describe('acting from an on-the-ball decision', () => {
     requestActionMenu(state)
 
     expect(
-      submitEncounterAction(state, { kind: 'pass', targetId: 'home:wakka', techniqueId: null, breakPast: 0 }),
+      submitEncounterAction(state, { kind: 'pass', targetId: 'home:wakka', techniqueId: null }),
     ).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })
@@ -189,7 +189,7 @@ describe('acting from an on-the-ball decision', () => {
     const carrier = inTheClear(state)
     const encounter = openOnTheBall(state, carrier)
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(carrier.id)
@@ -202,7 +202,7 @@ describe('acting from an on-the-ball decision', () => {
     const before = carrier.hp
     const encounter = openOnTheBall(state, carrier)
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     expect(carrier.hp).toBe(before)
   })
 
