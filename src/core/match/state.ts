@@ -4,7 +4,12 @@ import { POSITION_KEYS, type TeamDef } from '../../data/types'
 import { findPlayer } from '../../data/teams'
 import { desiredPosition } from '../ai/positioning'
 import { chooseEncounterAction } from '../ai/decisions'
-import { engagingDefenders, openEncounter, resolveEncounter } from '../encounter/encounter'
+import {
+  engagingDefenders,
+  openDistribution,
+  openEncounter,
+  resolveEncounter,
+} from '../encounter/encounter'
 import { kickoffPosition } from './formation'
 import { stepFlight } from './flight'
 import {
@@ -267,10 +272,18 @@ function movePlayers(state: MatchState, dt: number, input: MatchInput): void {
 
 /** Freeze play and open an encounter once defenders have closed the carrier down. */
 function maybeOpenEncounter(state: MatchState): void {
-  if (state.engageCooldown > 0) return
-
   const carrier = carrierOf(state)
   if (!carrier) return
+
+  // A keeper who has the ball distributes immediately, regardless of pressure:
+  // holding the line and finding a teammate is the whole of their job on the
+  // ball, so there is nothing to wait for.
+  if (carrier.slot === 'GK') {
+    state.phase = { kind: 'encounter', encounter: openDistribution(state, carrier) }
+    return
+  }
+
+  if (state.engageCooldown > 0) return
 
   const defenders = engagingDefenders(state, carrier)
   if (defenders.length === 0) return
@@ -334,7 +347,9 @@ function applyEncounterAction(
  */
 function chooseControlled(state: MatchState): string {
   const carrier = carrierOf(state)
-  if (carrier?.team === USER_TEAM) return carrier.id
+  // A keeper on the ball is never handed over: they are rooted to their line and
+  // distribute through the menu, so there is nothing for the user to steer.
+  if (carrier?.team === USER_TEAM && carrier.slot !== 'GK') return carrier.id
 
   let best: Player | undefined
   let bestDistance = Infinity

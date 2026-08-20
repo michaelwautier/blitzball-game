@@ -71,6 +71,11 @@ export interface Encounter {
   endurance: number
   /** Delay before an AI carrier commits, so its choice is readable. */
   thinkTimer: number
+  /**
+   * Passing is the only legal action. Set for a keeper restarting play, who
+   * distributes from the line rather than dribbling or shooting.
+   */
+  passOnly: boolean
 }
 
 /** A pass or shot travelling, still liable to be contested. */

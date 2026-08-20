@@ -31,7 +31,7 @@ export class DebugOverlay {
       `you     ${controlled ? `${controlled.def.name} ${controlled.slot}` : '—'}`,
       '',
       'WASD / arrows to swim',
-      '1–3 in an encounter',
+      'number keys to choose in an encounter',
       '~ toggle overlay',
     ].join('\n')
   }

@@ -74,6 +74,24 @@ export function openEncounter(
     })),
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+    passOnly: false,
+  }
+}
+
+/**
+ * A keeper restarting play after claiming the ball.
+ *
+ * Keepers hold their line: they never dribble out or shoot, so the only decision
+ * is who to find. Modelled as an encounter with no defenders so it reuses the
+ * same menu, resolution and technique handling as any other pass.
+ */
+export function openDistribution(state: MatchState, keeper: Player): Encounter {
+  return {
+    carrierId: keeper.id,
+    defenders: [],
+    endurance: state.endurance,
+    thinkTimer: keeper.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+    passOnly: true,
   }
 }
 
@@ -92,6 +110,12 @@ export function resolveEncounter(
   const carrier = playerById(state, encounter.carrierId)
   if (!carrier) {
     return { action: action.kind, success: false, summary: 'Possession lost' }
+  }
+
+  // A keeper on the ball may only pass; anything else is quietly refused rather
+  // than half-applied, so a stray input cannot walk a goalkeeper up the pool.
+  if (encounter.passOnly && action.kind !== 'pass') {
+    return { action: action.kind, success: false, summary: `${carrier.def.name} must find a teammate` }
   }
 
   switch (action.kind) {
