@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ENGAGE_RADIUS, engagingDefenders, openEncounter, resolveEncounter } from './encounter'
+import {
+  ENGAGE_RADIUS,
+  engagingDefenders,
+  openEncounter,
+  resolveEncounter,
+  tackleRange,
+} from './encounter'
 import { createMatch } from '../match/state'
 import { giveBallTo } from '../match/possession'
 import type { MatchState, Player } from '../match/types'
@@ -107,16 +113,87 @@ describe('breakthrough', () => {
     expect(state.engageCooldown).toBeGreaterThan(0)
   })
 
-  it('drains endurance by the tackle it faced', () => {
+  it('drains endurance by the tackles it faced', () => {
     const state = newMatch()
     const carrier = setUpEncounter(state, 'home:wakka', 2)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 100
-    const attack = encounter.defenders.reduce((sum, d) => sum + d.attack, 0)
+
+    const { min, max } = tackleRange(encounter.defenders)
+    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    // Each tackle is rolled when it is made, so the drain lands somewhere in the
+    // range the menu advertised rather than on an exact figure.
+    expect(state.endurance).toBeLessThanOrEqual(100 - min)
+    expect(state.endurance).toBeGreaterThanOrEqual(100 - max)
+  })
+
+  it('has every engaged defender put a tackle in', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 100
+
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    // Two defenders, so two subtractions in the summary.
+    expect(result.summary.match(/−/g)).toHaveLength(2)
+  })
+
+  it('stops once the ball is dislodged rather than piling on', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:tidus', 3)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 1
+
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    // The first tackle takes it; the others never needed to commit.
+    expect(result.success).toBe(false)
+    expect(result.summary.match(/−/g)).toHaveLength(1)
+  })
+
+  it('gives the ball to whoever took the endurance to zero', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:tidus', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 1
 
     resolveEncounter(state, encounter, { kind: 'breakthrough' })
 
-    expect(state.endurance).toBe(100 - attack)
+    // Closest defender tackles first, so with one point of endurance it is theirs.
+    expect(state.ball.carrier).toBe(engaged[0]!.id)
+  })
+
+  it('leaves every defender who tackled behind the carrier', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 100
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    // Home attacks +x, so behind the carrier is to their left.
+    for (const defender of engaged) {
+      expect(defender.x, `${defender.def.name}`).toBeLessThan(carrier.x)
+      // Moved rather than swum: no interpolation gap left behind.
+      expect(Math.hypot(defender.x - defender.prevX, defender.y - defender.prevY)).toBe(0)
+    }
+  })
+
+  it('leaves the tackler behind the carrier too, having won the ball', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:tidus', 1)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 1
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    expect(state.ball.carrier).toBe(engaged[0]!.id)
+    expect(engaged[0]!.x).toBeLessThan(carrier.x)
   })
 
   it('loses the ball to the strongest tackler when endurance runs out', () => {
@@ -150,7 +227,8 @@ describe('breakthrough', () => {
     const attack = encounter.defenders[0]!.attack
 
     const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
-    expect(result.summary).toContain(`EN 30 − AT ${attack}`)
+    expect(result.summary).toMatch(/^EN 30 − \d+ = -?\d+/)
+    expect(attack).toBeGreaterThan(0)
   })
 })
 

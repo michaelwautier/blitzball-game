@@ -1,5 +1,5 @@
 import { distanceToOpposingGoal, isCovered } from '../core/ai/decisions'
-import { allowedActions } from '../core/encounter/encounter'
+import { allowedActions, tackleRange } from '../core/encounter/encounter'
 import { ACTION_HP_COST } from '../core/encounter/formulas'
 import { distanceBetween, outfieldTeammates, playerById } from '../core/match/queries'
 import { canAfford } from '../core/match/stats'
@@ -120,9 +120,7 @@ export class EncounterMenu {
     if (!carrier) return
 
     this.encounterKind = encounter.kind
-    const attack = encounter.defenders.reduce((total, d) => total + d.attack, 0)
-
-    this.rows = this.buildRows(state, carrier, encounter, attack)
+    this.rows = this.buildRows(state, carrier, encounter)
 
     const list = document.createElement('ul')
     list.className = 'enc-list'
@@ -134,7 +132,7 @@ export class EncounterMenu {
 
     this.element.replaceChildren(
       this.renderHeading(state, carrier, encounter),
-      this.renderOdds(encounter, attack),
+      this.renderOdds(encounter),
       list,
       hint,
     )
@@ -160,7 +158,7 @@ export class EncounterMenu {
     return heading
   }
 
-  private renderOdds(encounter: Encounter, attack: number): HTMLElement {
+  private renderOdds(encounter: Encounter): HTMLElement {
     const odds = document.createElement('div')
     odds.className = 'enc-odds'
 
@@ -171,23 +169,20 @@ export class EncounterMenu {
       return odds
     }
 
-    const survives = encounter.endurance - attack
+    const { min, max } = tackleRange(encounter.defenders)
+    const best = encounter.endurance - min
+    const worst = encounter.endurance - max
+
     odds.innerHTML =
       `<span class="enc-en">EN ${encounter.endurance}</span>` +
       `<span class="enc-vs">vs</span>` +
-      `<span class="enc-at">AT ${attack}</span>` +
-      `<span class="enc-outcome ${survives > 0 ? 'good' : 'bad'}">` +
-      `${survives > 0 ? `${survives} left` : 'not enough'}</span>`
+      `<span class="enc-at">AT ${min === max ? min : `${min}–${max}`}</span>` +
+      `<span class="enc-outcome ${outcomeTone(best, worst)}">${describeOdds(best, worst)}</span>`
 
     return odds
   }
 
-  private buildRows(
-    state: MatchState,
-    carrier: Player,
-    encounter: Encounter,
-    attack: number,
-  ): Row[] {
+  private buildRows(state: MatchState, carrier: Player, encounter: Encounter): Row[] {
     switch (this.mode) {
       case 'passTargets':
         return this.passTargetRows(state, carrier)
@@ -196,21 +191,23 @@ export class EncounterMenu {
       case 'shootTechnique':
         return this.techniqueRows(carrier, 'shoot')
       case 'actions':
-        return this.actionRows(carrier, encounter, attack)
+        return this.actionRows(carrier, encounter)
     }
   }
 
   /** Built from what the engine permits, so the two cannot disagree. */
-  private actionRows(carrier: Player, encounter: Encounter, attack: number): Row[] {
+  private actionRows(carrier: Player, encounter: Encounter): Row[] {
     const rows: Row[] = []
     const permitted = allowedActions(encounter.kind)
 
     if (permitted.includes('breakthrough')) {
-      const left = encounter.endurance - attack
+      const { min, max } = tackleRange(encounter.defenders)
+      const best = encounter.endurance - min
+      const worst = encounter.endurance - max
       rows.push({
         label: 'Breakthrough',
-        detail: `EN ${encounter.endurance} − AT ${attack} = ${left}`,
-        tone: left > 0 ? 'safe' : 'risky',
+        detail: `EN ${encounter.endurance} − AT ${min === max ? min : `${min}–${max}`}`,
+        tone: outcomeTone(best, worst) === 'good' ? 'safe' : worst > 0 ? 'neutral' : 'risky',
         effect: { commit: { kind: 'breakthrough' } },
         enabled: true,
       })
@@ -388,4 +385,22 @@ export class EncounterMenu {
     this.mode = row.effect.open
     this.signature = ''
   }
+}
+
+/**
+ * How a breakthrough looks before it is attempted.
+ *
+ * Three honest states rather than two: certain to get through, certain not to,
+ * and the interesting middle where it depends on the rolls.
+ */
+function describeOdds(best: number, worst: number): string {
+  if (worst > 0) return `${worst}–${best} left`
+  if (best <= 0) return 'not enough'
+  return `${best} left at best`
+}
+
+function outcomeTone(best: number, worst: number): 'good' | 'bad' | 'mixed' {
+  if (worst > 0) return 'good'
+  if (best <= 0) return 'bad'
+  return 'mixed'
 }

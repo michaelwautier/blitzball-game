@@ -58,14 +58,18 @@ function simulateMatch(seed: string, homeTeam = BESAID_AUROCHS): MatchReport {
 }
 
 describe('match balance', () => {
-  const reports = Array.from({ length: 12 }, (_, i) => simulateMatch(`balance-${i}`))
+  // Twenty-four rather than a dozen: the Aurochs win roughly one match in six,
+  // so a smaller sample throws up wins-free runs often enough to make the
+  // "the underdog can take one" assertion below flaky rather than informative.
+  const MATCHES = 24
+  const reports = Array.from({ length: MATCHES }, (_, i) => simulateMatch(`balance-${i}`))
   const total = (pick: (r: MatchReport) => number) => reports.reduce((s, r) => s + pick(r), 0)
   const goals = total((r) => r.home + r.away)
 
   it('reaches full time within a sensible number of ticks', () => {
     // simulateMatch bails at its tick ceiling; a match that never ends would
     // show up as every scoreline being identical or the loop being cut short.
-    expect(reports).toHaveLength(12)
+    expect(reports).toHaveLength(MATCHES)
   })
 
   it('produces encounters throughout, not a procession', () => {

@@ -55,7 +55,13 @@ export type EncounterAction =
 
 export interface EncounterDefender {
   id: string
-  /** AT rolled once when the encounter opens, so the odds cannot be re-rolled. */
+  /**
+   * The defender's attack stat as it stands, not a roll of it.
+   *
+   * Each tackle is rolled when it is actually made, so the menu shows the range
+   * a carrier is up against rather than promising an outcome — barging through
+   * two defenders is a gamble, and it should look like one.
+   */
   attack: number
 }
 
