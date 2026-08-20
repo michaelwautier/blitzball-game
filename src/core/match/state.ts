@@ -367,6 +367,9 @@ function maybeOpenEncounter(state: MatchState): void {
   if (defenders.length === 0) return
 
   state.phase = { kind: 'encounter', encounter: openEncounter(state, carrier, defenders) }
+  // One line per defender, as FFX calls them out. Nearest first, matching both
+  // the order they are challenged in and the order the menu lists them.
+  announce(state, defenders.map((d) => `${d.def.name} on defense!`).join('\n'))
 }
 
 /**

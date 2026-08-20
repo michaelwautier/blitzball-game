@@ -137,12 +137,13 @@ encounter flow adopts FFX's breakthrough semantics. Five PRs, in this order — 
 cannot break anything first, then gameplay changes one at a time so each can be measured
 against the ladder alone.
 
-1. **FFX HUD layout** (DOM/CSS only). Radar to the bottom-right with `TIME` and the score
-   stacked beneath it; the event line ("Kulukan on defense!", one per engaged defender) to the
-   bottom-left; the debug overlay above it; the encounter menu to the top-left, compacted into
-   an FFX-style titled box. Break options are named — "No Break / Break to Nuvy Ronso / Break
-   to Nuvy Ronso & Kiyuri" — from the encounter's nearest-first defender list. The emphatic
-   goal banner stays centred.
+1. **FFX HUD layout** ✅ (#30). Radar to the bottom-right with `TIME` and the score stacked
+   beneath it; the event line ("Kulukan on defense!", one per engaged defender) to the
+   bottom-left; the debug overlay directly above it; the encounter menu to the top-left,
+   compacted into an FFX-style titled box with each option's detail under its label. Break
+   options are named — "No Break / Break to Deim / Break to Deim & Vuroja" — cumulatively and
+   nearest-first, matching the order they are actually challenged in. The emphatic goal banner
+   stays centred.
 2. **The conceding team takes the restart.** After a goal, `resetForKickoff` hands the ball to
    `opponentOf(scorer)`'s MF at centre instead of racing a scattered loose ball — the scorer
    winning that race half the time was a compounding unfairness. Each half still opens with
