@@ -11,6 +11,7 @@ import {
 } from './encounter'
 import { rollBounds } from './formulas'
 import { createMatch, stepMatch } from '../match/state'
+import { POOL_RADIUS } from '../pitch'
 import { giveBallTo } from '../match/possession'
 import type { MatchState, Player } from '../match/types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
@@ -157,6 +158,78 @@ describe('how much blocking gets counted', () => {
     expect(range.min).toBeGreaterThan(0)
     const { results } = shootWith(1, 'under')
     expect(results.every((r) => !r.success)).toBe(true)
+  })
+})
+
+describe('staging the encounter', () => {
+  it('brings every engaged defender round in front of the carrier', () => {
+    const state = newMatch('stage')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    // Start them behind, so being in front afterwards means they were moved.
+    for (const defender of engaged) defender.x = carrier.x - 3
+
+    openEncounter(state, carrier, engaged)
+
+    const forward = Math.sign(carrier.x) || 1
+    for (const defender of engaged) {
+      expect(defender.lunge, `${defender.def.name} was not staged`).not.toBeNull()
+      const goalSide = Math.sign(defender.lunge!.toX - carrier.x) === forward
+      expect(goalSide, `${defender.def.name} was staged behind`).toBe(true)
+    }
+  })
+
+  it('fans them apart rather than stacking them on one spot', () => {
+    const state = newMatch('fan')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    openEncounter(state, carrier, engaged)
+
+    const [first, second] = engaged
+    expect(first!.lunge!.toY).not.toBe(second!.lunge!.toY)
+  })
+
+  it('travels there rather than teleporting', () => {
+    const state = newMatch('travel')
+    const carrier = setUpEncounter(state, 'home:wakka', 1)
+    const engaged = engagingDefenders(state, carrier)
+    const before = { x: engaged[0]!.x, y: engaged[0]!.y }
+
+    openEncounter(state, carrier, engaged)
+    // Committed, not applied: the body has not moved yet.
+    expect({ x: engaged[0]!.x, y: engaged[0]!.y }).toEqual(before)
+  })
+
+  it('keeps everyone inside the pool, even against the wall', () => {
+    const state = newMatch('wall')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    carrier.y = POOL_RADIUS * 0.97
+    const engaged = engagingDefenders(state, carrier)
+    openEncounter(state, carrier, engaged)
+
+    for (const defender of engaged) {
+      const spot = defender.lunge!
+      expect(Math.hypot(spot.toX, spot.toY)).toBeLessThanOrEqual(POOL_RADIUS)
+    }
+  })
+
+  it('plays the staging out while the menu is open', () => {
+    // The world is frozen during an encounter, but a committed movement is not.
+    const state = newMatch('staging-runs')
+    const carrier = setUpEncounter(state, 'home:wakka', 1)
+    giveBallTo(state, carrier)
+    const defender = engagingDefenders(state, carrier)[0]!
+    state.phase = {
+      kind: 'encounter',
+      encounter: openEncounter(state, carrier, [defender]),
+    }
+    const destination = { x: defender.lunge!.toX, y: defender.lunge!.toY }
+
+    for (let i = 0; i < 60; i++) stepMatch(state, 1 / 60)
+
+    expect(defender.lunge).toBeNull()
+    expect(defender.x).toBeCloseTo(destination.x, 3)
+    expect(defender.y).toBeCloseTo(destination.y, 3)
   })
 })
 
@@ -443,13 +516,24 @@ describe('breaking past some of them', () => {
   })
 
   it('carries only the defenders it took on past the carrier', () => {
-    const { state, engaged, encounter } = twoOn('lunge')
+    const { state, carrier, engaged, encounter } = twoOn('lunge')
     resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
 
-    // The one challenged is on their way past; the one left alone has not moved.
-    expect(engaged[0]!.lunge).not.toBeNull()
-    expect(engaged[1]!.lunge).toBeNull()
-    expect(engaged[1]!.recovery).toBe(0)
+    // Both have a lunge — everyone engaged was staged in front when the
+    // encounter opened — so the difference is where it takes them, and who is
+    // out of the play afterwards.
+    const forward = Math.sign(carrier.x) || 1
+    const challenged = engaged[0]!
+    const untouched = engaged[1]!
+
+    expect(challenged.recovery).toBeGreaterThan(0)
+    expect(untouched.recovery).toBe(0)
+
+    // The one challenged ends up behind the carrier; the other stays in front.
+    const behind = (defender: typeof challenged) =>
+      Math.sign(defender.lunge!.toX - carrier.x) !== forward
+    expect(behind(challenged)).toBe(true)
+    expect(behind(untouched)).toBe(false)
   })
 
   it('spends endurance only on the challenge it actually made', () => {

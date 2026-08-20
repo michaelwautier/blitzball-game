@@ -168,10 +168,13 @@ against the ladder alone.
    rather than merely forgoing regen, floored at zero so exhaustion stays the penalty.
    Measured at 0.5/s: costs about 0.12 goals a match, with shots and encounters unmoved, so
    stamina matters without distorting anything.
-5. **Encounter staging and camera.** Engaged defenders glide (via the existing lunge
-   mechanism) into a line between the attacker and their goal when the encounter opens, and
-   the camera dollies toward the tableau while the menu is up. Mostly presentation, but the
-   staged positions are live when play resumes, so it gets a ladder sample too.
+5. **Encounter staging and camera** ✅ (#35). Engaged defenders glide — via the existing lunge
+   mechanism, so it is watched rather than applied — into a line between the carrier and the
+   goal being attacked, fanned so two defenders read as two bodies. The camera closes in while
+   the menu is open. Lunges now advance during an encounter, which also fixes a defender
+   hanging motionless mid-lunge after a partial break. Measured: 2.27 to 2.37 goals a match
+   with encounters unmoved. Labels became distance-scaled in the same change, since the closer
+   camera turned a nearby player's name into a quarter of the screen.
 6. **Arrow-key selection.** Move through the encounter options with the arrow keys and confirm
    with space or enter, rather than hitting the number of the row. The number keys stay as a
    shortcut. UI only.

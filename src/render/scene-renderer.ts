@@ -64,6 +64,17 @@ const CAMERA_EASE = 0.5
  */
 const CAMERA_CONFINE = 0.9
 
+/**
+ * How far the camera closes in while an encounter is being decided.
+ *
+ * A fraction of the usual stand-off, not a fixed distance, so it scales with the
+ * pool like everything else here. Modest on purpose: the decision is read from
+ * the menu and the stat panel, and the camera's job is to say *who* the menu is
+ * talking about by bringing the confrontation closer, not to swap to a different
+ * shot and lose the run of play.
+ */
+const ENCOUNTER_CLOSE_IN = 0.72
+
 /** Markings draw after the water, so the pitch is never lost inside its own pool. */
 const MARKINGS_ORDER = 1
 
@@ -169,10 +180,14 @@ export class SceneRenderer {
     const focus = interpolateToScene(focusPlayer, focusPlayer, 1)
     const towards = Math.sign(threatenedGoalX(state) - focus.x) || 1
 
+    // Closer while a decision is open, so the defenders the menu names are
+    // legible. Eased into like every other camera move, by the lerp below.
+    const close = state.phase.kind === 'encounter' ? ENCOUNTER_CLOSE_IN : 1
+
     this.cameraGoal.set(
-      focus.x - towards * CAMERA_TRAIL,
-      CAMERA_HEIGHT,
-      focus.z * DEPTH_FOLLOW + CAMERA_BACK,
+      focus.x - towards * CAMERA_TRAIL * close,
+      CAMERA_HEIGHT * close,
+      focus.z * DEPTH_FOLLOW + CAMERA_BACK * close,
     )
     // Aim a little beyond play, so the pitch sits in the middle of the frame
     // rather than riding high with empty water in the foreground.
@@ -312,12 +327,33 @@ export class SceneRenderer {
     material.transparent = player.recovery > 0
     if (isExhausted(player)) material.emissive.setHex(COLOURS.danger)
 
+    this.sizeLabels(body)
+
     const labels = statusLabels(player)
     body.status.visible = labels.length > 0
     if (labels.length > 0 && body.statusText !== labels.join(' ')) {
       body.statusText = labels.join(' ')
       paintLabel(body.status, body.statusText, '#c98bff')
     }
+  }
+
+  /**
+   * Hold names at a constant size on screen, whatever the distance.
+   *
+   * A sprite has a size in the world, so it grows as the camera nears it — and
+   * a player who swims close to the camera had their name fill a quarter of the
+   * frame. Scaling by distance undoes the perspective divide, which is what the
+   * labels were always meant to do: a name is a caption, not part of the scene.
+   *
+   * Clamped at both ends so a name never becomes unreadably small far away, and
+   * never overpowers the play close up.
+   */
+  private sizeLabels(body: PlayerBody): void {
+    const distance = this.camera.position.distanceTo(body.group.position)
+    const scale = clamp(distance / LABEL_REFERENCE_DISTANCE, LABEL_MIN_SCALE, LABEL_MAX_SCALE)
+
+    body.name.scale.set(LABEL_WIDTH * scale, LABEL_HEIGHT * scale, 1)
+    body.status.scale.set(LABEL_WIDTH * scale, LABEL_HEIGHT * scale, 1)
   }
 
   private bodyFor(state: MatchState, player: Player): PlayerBody {
@@ -366,7 +402,7 @@ export class SceneRenderer {
     group.add(status)
 
     this.scene.add(group)
-    const body: PlayerBody = { group, mesh, ring, marker, status, statusText: '' }
+    const body: PlayerBody = { group, mesh, ring, marker, name, status, statusText: '' }
     this.bodies.set(player.id, body)
     return body
   }
@@ -377,6 +413,7 @@ interface PlayerBody {
   mesh: THREE.Mesh
   ring: THREE.Mesh
   marker: THREE.Mesh
+  name: THREE.Sprite
   status: THREE.Sprite
   statusText: string
 }
@@ -399,11 +436,24 @@ function ring(radius: number, thickness: number, colour: number, opacity: number
  * Sprites rather than 3D text: names have to stay legible from anywhere in the
  * pool, and a mesh would turn edge-on and disappear.
  */
+/** A label's size in world units at `LABEL_REFERENCE_DISTANCE` from the camera. */
+const LABEL_WIDTH = 14
+const LABEL_HEIGHT = 3.5
+
+/** The distance labels are sized for; nearer or further, they are scaled to match. */
+const LABEL_REFERENCE_DISTANCE = POOL_RADIUS * 0.62
+const LABEL_MIN_SCALE = 0.55
+const LABEL_MAX_SCALE = 1.9
+
+function clamp(value: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, value))
+}
+
 function makeLabel(text: string, colour: string): THREE.Sprite {
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ transparent: true, depthTest: false }),
   )
-  sprite.scale.set(14, 3.5, 1)
+  sprite.scale.set(LABEL_WIDTH, LABEL_HEIGHT, 1)
   paintLabel(sprite, text, colour)
   return sprite
 }
