@@ -230,7 +230,7 @@ export class EncounterMenu {
       case 'passTargets':
         return this.passTargetRows(state, carrier)
       case 'breakPast':
-        return this.breakPastRows(carrier, encounter)
+        return this.breakPastRows(state, carrier, encounter)
       case 'passTechnique':
         return this.techniqueRows(carrier, 'pass')
       case 'shootTechnique':
@@ -377,7 +377,7 @@ export class EncounterMenu {
    * blocking out of the throw that follows. The rows show both sides of that
    * trade, so the decision is made on the numbers rather than on a hunch.
    */
-  private breakPastRows(carrier: Player, encounter: Encounter): Row[] {
+  private breakPastRows(state: MatchState, carrier: Player, encounter: Encounter): Row[] {
     const stat = this.pendingThrow === 'pass' ? 'pa' : 'sh'
     const power = carrier.stats[stat]
     const label = stat.toUpperCase()
@@ -389,7 +389,7 @@ export class EncounterMenu {
       const survives = power - facing.max > 0
 
       return {
-        label: count === 0 ? 'Throw through them' : `Get past ${count}`,
+        label: count === 0 ? 'No Break' : `Break to ${this.namesOf(state, encounter, count)}`,
         detail:
           `${label} ${power} vs BL ${facing.min}–${facing.max}` +
           (count > 0 ? ` · costs EN ${cost.min}–${cost.max}` : ''),
@@ -399,6 +399,23 @@ export class EncounterMenu {
         enabled: count === 0 || cost.max < encounter.endurance,
       }
     })
+  }
+
+  /**
+   * The defenders a break of this depth goes through, named.
+   *
+   * Cumulative and nearest-first, matching how the challenge actually resolves:
+   * "Break to Kiyuri" means through everyone up to and including Kiyuri. FFX
+   * names them rather than counting them, and with at most two engaged there is
+   * always room to.
+   */
+  private namesOf(state: MatchState, encounter: Encounter, count: number): string {
+    const names = encounter.defenders
+      .slice(0, count)
+      .map((defender) => playerById(state, defender.id)?.def.name ?? '?')
+
+    if (names.length <= 1) return names[0] ?? ''
+    return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
   }
 
   /**
@@ -465,9 +482,18 @@ export class EncounterMenu {
     button.className = `enc-option enc-${row.tone}`
     button.dataset.key = String(key)
     button.disabled = !row.enabled
-    button.innerHTML =
-      `<kbd>${key}</kbd><span class="enc-label">${row.label}</span>` +
-      `<span class="enc-detail">${row.detail}</span>`
+    // Built as nodes rather than markup: rows now carry player names, and names
+    // are data. Nothing here should be able to become an element.
+    const kbd = document.createElement('kbd')
+    kbd.textContent = String(key)
+    const label = document.createElement('span')
+    label.className = 'enc-label'
+    label.textContent = row.label
+    const detail = document.createElement('span')
+    detail.className = 'enc-detail'
+    detail.textContent = row.detail
+
+    button.append(kbd, label, detail)
     item.append(button)
     return item
   }

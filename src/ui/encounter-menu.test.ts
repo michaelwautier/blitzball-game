@@ -245,8 +245,24 @@ describe('choosing how many to get past', () => {
   it('offers every count from nobody up to all of them', () => {
     openMenu('contested')
     press('3')
-    // One defender in the fixture, so: throw through them, or get past them.
-    expect(labels()).toEqual(['Throw through them', 'Get past 1'])
+    // One defender in the fixture, so: throw through them, or break past them.
+    // FFX names the defender rather than counting, which is only possible
+    // because at most two ever engage.
+    expect(labels()).toEqual(['No Break', 'Break to Doram'])
+  })
+
+  it('names the defenders cumulatively when two are on the carrier', () => {
+    const state = openMenu('contested')
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    state.phase.encounter.defenders = [
+      { id: 'away:doram', attack: 11, block: 5 },
+      { id: 'away:balgerda', attack: 9, block: 8 },
+    ]
+    menu.update(state)
+    press('3')
+
+    // Breaking to the second means going through the first as well.
+    expect(labels()).toEqual(['No Break', 'Break to Doram', 'Break to Doram & Balgerda'])
   })
 
   it('shows what clearing them costs and what it buys', () => {
@@ -255,8 +271,8 @@ describe('choosing how many to get past', () => {
 
     const through = details()[0]!
     const past = details()[1]!
-    // Throwing through faces their blocking; getting past costs endurance and
-    // leaves nothing in the way.
+    // Not breaking faces their blocking; breaking costs endurance and leaves
+    // nothing in the way.
     expect(through).toMatch(/BL \d+–\d+/)
     expect(through).not.toContain('EN')
     expect(past).toContain('costs EN')
@@ -398,13 +414,13 @@ describe('going back', () => {
     openMenu('contested')
     press('2')
     press('1')
-    expect(labels()).toContain('Throw through them')
+    expect(labels()).toContain('No Break')
 
     press('1')
     expect(labels()).toContain('Straight pass')
 
     press('Escape')
-    expect(labels()).toContain('Throw through them')
+    expect(labels()).toContain('No Break')
 
     press('Escape')
     expect(labels()).toContain('Tidus')
