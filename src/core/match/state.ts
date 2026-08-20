@@ -125,6 +125,7 @@ function buildSide(team: TeamState, careers: CareerLookup): Player[] {
       stats,
       hp: stats.hp,
       statuses: [],
+      recovery: 0,
     }
   })
 }
@@ -139,6 +140,7 @@ export function resetForKickoff(state: MatchState): void {
     player.prevY = spot.y
     player.vx = 0
     player.vy = 0
+    player.recovery = 0
   }
 
   const { ball } = state
@@ -272,6 +274,7 @@ function maybeShootOnSight(state: MatchState): void {
 function updateCondition(state: MatchState, dt: number): void {
   for (const player of state.players) {
     tickStatuses(player, dt)
+    player.recovery = Math.max(0, player.recovery - dt)
     if (state.ball.carrier === player.id) continue
     player.hp = Math.min(player.stats.hp, player.hp + HP_REGEN_PER_SECOND * dt)
   }
@@ -321,6 +324,12 @@ function movePlayers(state: MatchState, dt: number, input: MatchInput): void {
   )
 
   state.players.forEach((player, index) => {
+    // Beaten a moment ago and still turning round: no swimming either way.
+    if (player.recovery > 0) {
+      steerTowards(player, player, 0, dt)
+      return
+    }
+
     const target = targets[index]
     const speed = speedOf(player, state)
     if (target) steerTowards(player, target, speed, dt)

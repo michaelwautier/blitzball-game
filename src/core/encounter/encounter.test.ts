@@ -6,7 +6,7 @@ import {
   resolveEncounter,
   tackleRange,
 } from './encounter'
-import { createMatch } from '../match/state'
+import { createMatch, stepMatch } from '../match/state'
 import { giveBallTo } from '../match/possession'
 import type { MatchState, Player } from '../match/types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
@@ -181,6 +181,61 @@ describe('breakthrough', () => {
       // Moved rather than swum: no interpolation gap left behind.
       expect(Math.hypot(defender.x - defender.prevX, defender.y - defender.prevY)).toBe(0)
     }
+  })
+
+  it('puts every beaten defender out of the play for a moment', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = 100
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+
+    for (const defender of engaged) {
+      expect(defender.recovery, defender.def.name).toBeGreaterThan(0)
+    }
+  })
+
+  it('will not let a defender still recovering start another encounter', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    expect(engaged.length).toBeGreaterThan(0)
+
+    for (const defender of engaged) defender.recovery = 1
+    // Put them right back on the carrier: proximity alone is not enough.
+    for (const defender of engaged) {
+      defender.x = carrier.x
+      defender.y = carrier.y + 1
+    }
+
+    expect(engagingDefenders(state, carrier)).toHaveLength(0)
+  })
+
+  it('lets them back in once they have recovered', () => {
+    const state = newMatch()
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const engaged = engagingDefenders(state, carrier)
+    for (const defender of engaged) defender.recovery = 0.1
+
+    for (let i = 0; i < 30; i++) stepMatch(state, 1 / 60)
+    for (const defender of engaged) expect(defender.recovery).toBe(0)
+  })
+
+  it('holds a recovering defender still rather than letting them give chase', () => {
+    const state = newMatch('held')
+    const carrier = setUpEncounter(state, 'home:wakka', 1)
+    const defender = engagingDefenders(state, carrier)[0]!
+    defender.recovery = 1.5
+    const where = { x: defender.x, y: defender.y }
+
+    // Put the ball far away, so anything mobile would set off after it.
+    state.ball.x = -60
+    state.ball.y = 20
+    for (let i = 0; i < 30; i++) stepMatch(state, 1 / 60)
+
+    expect(Math.hypot(defender.x - where.x, defender.y - where.y)).toBeLessThan(1)
   })
 
   it('leaves the tackler behind the carrier too, having won the ball', () => {
