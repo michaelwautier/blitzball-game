@@ -63,9 +63,10 @@ Match state machine: `Kickoff → FreePlay ⇄ Encounter → (Resolution anim) �
 
 ## Phases
 
-### Phase 0 — Scaffold (small)
-Vite + TS project, fixed-timestep game loop, Canvas pool rendering (circular pool,
-center line, two goals), debug overlay. Seedable RNG utility.
+### Phase 0 — Scaffold ✅ (PR #1)
+Vite + TS project, fixed-timestep game loop with interpolated rendering, Canvas pool
+rendering (circular pool, halfway line, two goals), debug overlay, seedable RNG, and CI
+running typecheck/tests/build on every PR.
 
 ### Phase 1 — Playable single match (the real PoC milestone)
 - Data: Aurochs + Goers rosters with stats.
