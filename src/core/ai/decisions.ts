@@ -1,5 +1,6 @@
 import { GOAL_HALF_HEIGHT, goalLineX } from '../pitch'
 import { ACTION_HP_COST, CONTEST_RADIUS, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
+import { tackleRange } from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
 import {
   distanceBetween,
@@ -55,9 +56,12 @@ export function chooseEncounterAction(
   if (encounter.kind === 'distribution') return chooseDistribution(state, carrier)
 
   const goalDistance = distanceToOpposingGoal(state, carrier)
-  const incoming = encounter.defenders.reduce((total, d) => total + d.attack, 0)
+  // Judged on the middle of the range rather than the best case, so the AI is
+  // not repeatedly surprised by tackles landing at the top of their roll.
+  const { min, max } = tackleRange(encounter.defenders)
+  const expected = (min + max) / 2
   const canBreakThrough =
-    encounter.kind === 'contested' && encounter.endurance - incoming > BREAKTHROUGH_MARGIN
+    encounter.kind === 'contested' && encounter.endurance - expected > BREAKTHROUGH_MARGIN
 
   if (isShotWorthTaking(state, carrier, goalDistance)) {
     return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }

@@ -1,17 +1,20 @@
-import { PLAYER_RADIUS } from '../match/movement'
+import { clampToPool } from '../pitch'
+import { attackDirection } from '../match/formation'
+import { PLAYER_RADIUS, recordPrevious } from '../match/movement'
 import { distanceBetween, opponentOf, playerById } from '../match/queries'
-import { giveBallTo, releaseBall } from '../match/possession'
+import { giveBallTo } from '../match/possession'
 import { startPass, startShot } from '../match/flight'
 import type {
   Encounter,
   EncounterAction,
+  EncounterDefender,
   EncounterKind,
   EncounterResult,
   MatchState,
   Player,
 } from '../match/types'
 import { USER_TEAM } from '../match/types'
-import { ACTION_HP_COST, rollStat } from './formulas'
+import { ACTION_HP_COST, ROLL_HEADROOM, rollStat } from './formulas'
 import { findTechnique, techniquesOf, type Technique } from '../../data/techniques'
 import { applyStatus } from '../match/status'
 import { canAfford, effectiveStat, spendHp } from '../match/stats'
@@ -59,9 +62,9 @@ export function engagingDefenders(state: MatchState, carrier: Player): Player[] 
 /**
  * Open an encounter against these defenders.
  *
- * Each defender's AT is rolled once, here, and held for the duration. Rolling up
- * front rather than at resolution means the odds cannot shift based on which
- * action is chosen, and lets the menu honestly show what is being faced.
+ * Their attack stats are recorded as they stand; the tackles themselves are
+ * rolled when they are made. The menu therefore shows a range rather than a
+ * promise, which is the honest presentation of a gamble.
  */
 export function openEncounter(
   state: MatchState,
@@ -70,10 +73,7 @@ export function openEncounter(
 ): Encounter {
   return {
     carrierId: carrier.id,
-    defenders: defenders.map((d) => ({
-      id: d.id,
-      attack: rollStat(effectiveStat(d, 'at'), state.rng),
-    })),
+    defenders: defenders.map((d) => ({ id: d.id, attack: effectiveStat(d, 'at') })),
     kind: 'contested',
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
@@ -94,6 +94,26 @@ export function openOnTheBall(state: MatchState, carrier: Player): Encounter {
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
   }
+}
+
+/**
+ * The least and most total tackle a carrier could face from these defenders.
+ *
+ * Mirrors the bounds of `rollStat`, and is the single source of truth for both
+ * the menu's odds and the AI's judgement — so what a player is shown and what
+ * the opponent reasons about cannot drift apart.
+ */
+export function tackleRange(defenders: readonly EncounterDefender[]): {
+  min: number
+  max: number
+} {
+  let min = 0
+  let max = 0
+  for (const defender of defenders) {
+    min += defender.attack
+    max += defender.attack + Math.floor(defender.attack * ROLL_HEADROOM)
+  }
+  return { min, max }
 }
 
 /** Which actions this kind of decision permits. */
@@ -167,10 +187,16 @@ export function resolveEncounter(
 }
 
 /**
- * Endurance versus the defenders' combined tackle.
+ * Each defender in turn puts in a tackle, and endurance has to survive them all.
+ *
+ * Tackles are resolved one at a time rather than as a single pooled total, so
+ * the carrier is up against a sequence of individual challenges: the first
+ * defender may take most of the endurance and leave the second an easy job, or
+ * may barely make contact. Whoever takes it to zero is the one who comes away
+ * with the ball, which is why the closest defender tackles first.
  *
  * The drain persists for the whole possession, so repeated breakthroughs get
- * progressively more dangerous — which is the pressure that makes passing and
+ * progressively more dangerous — that pressure is what makes passing and
  * shooting real decisions rather than fallbacks.
  */
 function resolveBreakthrough(
@@ -180,38 +206,78 @@ function resolveBreakthrough(
 ): EncounterResult {
   spendHp(carrier, ACTION_HP_COST.breakthrough)
 
-  const attack = encounter.defenders.reduce((total, d) => total + d.attack, 0)
-  const remaining = encounter.endurance - attack
-  state.endurance = Math.max(0, remaining)
+  let endurance = encounter.endurance
+  const rolls: number[] = []
+  const beaten: Player[] = []
+  let tackler: Player | undefined
 
-  if (remaining > 0) {
+  for (const engaged of encounter.defenders) {
+    const defender = playerById(state, engaged.id)
+    if (!defender) continue
+
+    const tackle = rollStat(effectiveStat(defender, 'at'), state.rng)
+    endurance -= tackle
+    rolls.push(tackle)
+    beaten.push(defender)
+
+    if (endurance <= 0) {
+      // This challenge is the one that dislodged the ball; the defenders behind
+      // it never needed to commit.
+      tackler = defender
+      break
+    }
+  }
+
+  state.endurance = Math.max(0, endurance)
+  // Everyone who put a tackle in has committed past the carrier by the end of
+  // it, whether or not they came away with the ball.
+  pushPastCarrier(state, beaten, carrier)
+
+  const sums = `EN ${encounter.endurance} − ${rolls.join(' − ')} = ${endurance}`
+
+  if (!tackler) {
     state.engageCooldown = BREAKTHROUGH_GRACE
     awardExp(state, carrier, 'breakthrough')
     return {
       action: 'breakthrough',
       success: true,
-      summary: `EN ${encounter.endurance} − AT ${attack} = ${remaining} · ${carrier.def.name} breaks through!`,
+      summary: `${sums} · ${carrier.def.name} breaks through!`,
     }
   }
 
-  // Out of endurance: the strongest tackler takes it off them.
-  const strongest = encounter.defenders.reduce((best, d) => (d.attack > best.attack ? d : best))
-  const tackler = playerById(state, strongest.id)
-
-  let techniqueNote = ''
   awardExp(state, tackler, 'tackle')
-  if (tackler) {
-    const technique = useTackleTechnique(tackler, carrier)
-    if (technique) techniqueNote = ` · ${technique.name}!`
-    giveBallTo(state, tackler)
-  } else {
-    releaseBall(state)
-  }
+  const technique = useTackleTechnique(tackler, carrier)
+  giveBallTo(state, tackler)
 
   return {
     action: 'breakthrough',
     success: false,
-    summary: `EN ${encounter.endurance} − AT ${attack} = ${remaining} · tackled by ${tackler?.def.name ?? 'the defence'}${techniqueNote}`,
+    summary: `${sums} · tackled by ${tackler.def.name}${technique ? ` · ${technique.name}!` : ''}`,
+  }
+}
+
+/**
+ * Put the defenders who tackled behind the carrier.
+ *
+ * A challenge carries a defender past the player they went through, so leaving
+ * them in front would mean a successful breakthrough changed nothing
+ * positionally and the same defenders re-engaged the moment the grace period
+ * ended. `recordPrevious` matters here: these bodies are being moved rather than
+ * swum, and without it the renderer interpolates across the jump.
+ */
+function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player): void {
+  const forward = attackDirection(state.teams[carrier.team].defending)
+
+  for (const defender of defenders) {
+    const spot = clampToPool(
+      { x: carrier.x - forward * (ENGAGE_RADIUS + 1), y: defender.y },
+      PLAYER_RADIUS,
+    )
+    defender.x = spot.x
+    defender.y = spot.y
+    defender.vx = 0
+    defender.vy = 0
+    recordPrevious(defender)
   }
 }
 
