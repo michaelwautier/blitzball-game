@@ -1,7 +1,7 @@
 import { GOAL_HALF_HEIGHT, clampToPool, goalLineX, type Vec2 } from '../pitch'
 import { CONTEST_RADIUS, contestReduction, keeperSaves, passPower, shotPower } from '../encounter/formulas'
 import { attackDirection } from './formation'
-import { PLAYER_RADIUS } from './movement'
+import { PLAYER_RADIUS, recordPrevious } from './movement'
 import { distanceBetween, keeperFor, opponentOf } from './queries'
 import { giveBallTo, releaseBall } from './possession'
 import { awardExp } from './exp'
@@ -230,5 +230,8 @@ function clearAreaAroundKeeper(state: MatchState, keeper: Player): void {
     player.y = spot.y
     player.vx = 0
     player.vy = 0
+    // Moved rather than swum: without this the renderer spends the next frames
+    // interpolating from where they used to be, drawing them in two places.
+    recordPrevious(player)
   }
 }

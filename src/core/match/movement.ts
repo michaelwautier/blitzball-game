@@ -24,7 +24,15 @@ export function maxSpeed(sp: number): number {
 /** Carrying the ball costs a little pace. */
 export const CARRY_SPEED_FACTOR = 0.88
 
-/** Snapshot the current position so rendering can interpolate across the tick. */
+/**
+ * Point the previous position at the current one.
+ *
+ * Called at the start of a tick, this snapshots where something was so the
+ * renderer can interpolate across the movement that follows. Called when nothing
+ * is going to move — a frozen phase, or straight after a position is set
+ * directly rather than swum to — it collapses the gap instead, which is what
+ * stops the renderer interpolating across a stale position.
+ */
 export function recordPrevious(m: Movable): void {
   m.prevX = m.x
   m.prevY = m.y
