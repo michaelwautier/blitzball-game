@@ -212,11 +212,10 @@
       }
       .enc-option {
         display: grid;
-        grid-template-columns: 20px 1fr;
         align-items: baseline;
-        gap: 2px 10px;
+        gap: 2px;
         width: 100%;
-        padding: 7px 10px;
+        padding: 7px 10px 7px 22px;
         border: 1px solid transparent;
         border-radius: 8px;
         background: rgb(255 255 255 / 0.05);
@@ -226,26 +225,27 @@
         text-align: left;
         cursor: pointer;
       }
-      .enc-option:hover {
-        background: rgb(255 255 255 / 0.11);
+      /* Where the arrow keys are sitting. Hovering moves it too, so the mouse
+         and the keyboard never point at different rows. */
+      .enc-option.enc-selected {
+        position: relative;
+        background: rgb(127 216 255 / 0.16);
         border-color: var(--edge);
       }
-      .enc-option kbd {
-        grid-row: 1 / span 2;
-        align-self: center;
-        min-width: 20px;
-        padding: 2px 0;
-        border-radius: 4px;
-        background: rgb(255 255 255 / 0.12);
-        font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
-        text-align: center;
+      /* FFX marks the choice with a cursor rather than only a highlight. */
+      .enc-option.enc-selected .enc-label::before {
+        content: '▶';
+        position: absolute;
+        margin-left: -14px;
+        font-size: 9px;
+        color: #ffd479;
+        vertical-align: 1px;
       }
       .enc-label {
         font-weight: 600;
       }
       /* Under the label rather than beside it: the box is narrow now. */
       .enc-detail {
-        grid-column: 2;
         font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
         opacity: 0.6;
       }

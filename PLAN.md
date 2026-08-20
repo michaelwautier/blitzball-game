@@ -175,9 +175,13 @@ against the ladder alone.
    hanging motionless mid-lunge after a partial break. Measured: 2.27 to 2.37 goals a match
    with encounters unmoved. Labels became distance-scaled in the same change, since the closer
    camera turned a nearby player's name into a quarter of the screen.
-6. **Arrow-key selection.** Move through the encounter options with the arrow keys and confirm
-   with space or enter, rather than hitting the number of the row. The number keys stay as a
-   shortcut. UI only.
+6. **Arrow-key selection** ✅ (#36). Move through the encounter options with the arrows and
+   confirm with space or enter, with an FFX cursor marking the choice. Hovering moves the
+   highlight too, so mouse and keyboard never point at different rows. It wraps at both ends
+   and skips options that cannot be chosen — an unaffordable technique stays visible, because
+   that is information, but holding an arrow never gets stuck on it. The number keys are gone
+   rather than kept as a shortcut: they were redundant the moment this existed, and the row
+   chips were noise in a box that had just been narrowed. UI only.
 7. **Make defending feel like defending.** `engageCooldown` is a single global timer, so every
    reception and every completed throw blacks out *all* encounters for four seconds — and on
    top of that, attacking has an override that defending does not: `requestActionMenu` (the
@@ -188,7 +192,8 @@ against the ladder alone.
    `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
    challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
    what #24 spent its effort on.
-8. **A throw flies to where it was aimed.** Two faults, one subject. Power is currently
+8. **A throw flies to where it was aimed.** Fidelity, not taste: this is how the original
+   behaves, and ours does not. Two faults, one subject. Power is currently
    drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
    and is collected by `nearestOpponent` — nearest to the **ball**, which is a defender
    standing on the trajectory. That reads as an interception by someone who, by design, is not

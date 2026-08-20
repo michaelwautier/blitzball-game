@@ -105,6 +105,29 @@ const click = (index: number) => {
   menu.update(current)
 }
 
+/**
+ * Choose the nth option, one-based, as a player does: walk the highlight down
+ * to it and confirm.
+ *
+ * The highlight starts on the first *enabled* row and skips disabled ones, so
+ * this walks by label rather than counting keypresses — otherwise a test that
+ * happens to sit below an unaffordable technique quietly picks the wrong row.
+ */
+const pick = (position: number) => {
+  const wanted = labels()[position - 1]
+  for (let guard = 0; guard <= labels().length; guard++) {
+    if (selectedLabel() === wanted) {
+      press(' ')
+      return
+    }
+    press('ArrowDown')
+  }
+  throw new Error(`could not reach option ${position} (${wanted})`)
+}
+
+const selectedLabel = () =>
+  element.querySelector('.enc-option.enc-selected .enc-label')?.textContent ?? undefined
+
 describe('when the menu shows at all', () => {
   it('stays hidden during open play', () => {
     const state = createMatch(BESAID_AUROCHS, LUCA_GOERS, 'play')
@@ -162,15 +185,15 @@ describe('what each kind of decision offers', () => {
 describe('choosing an action', () => {
   it('asks how many to break past rather than barging blindly', () => {
     openMenu('contested')
-    press('1')
+    pick(1)
     expect(onAction).not.toHaveBeenCalled()
     expect(labels()).toEqual(['No Break', 'Break to Doram'])
   })
 
   it('commits a breakthrough by key', () => {
     openMenu('contested', 'home:wakka', 40)
-    press('1')
-    press('2')
+    pick(1)
+    pick(2)
     expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
@@ -181,15 +204,15 @@ describe('choosing an action', () => {
     expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
-  it('ignores a key with no row behind it', () => {
+  it('ignores keys it has no use for', () => {
     openMenu('contested')
-    press('9')
+    for (const key of ['9', 'x', 'ArrowLeft', 'Shift']) press(key)
     expect(onAction).not.toHaveBeenCalled()
   })
 
   it('opens the target list rather than passing blindly', () => {
     openMenu('contested')
-    press('2')
+    pick(2)
     expect(onAction).not.toHaveBeenCalled()
     expect(labels()).toContain('Tidus')
   })
@@ -202,7 +225,7 @@ describe('choosing an action', () => {
     marker.y = tidus.y
     menu.update(state)
 
-    press('2')
+    pick(2)
     expect(labels()).toContain('Tidus')
     const tidusRow = labels().indexOf('Tidus')
     expect(details()[tidusRow]).toContain('marked')
@@ -228,7 +251,7 @@ describe('the pass target list', () => {
     }
     menu.update(state)
 
-    press('2')
+    pick(2)
     const order = labels()
     // Nearest first, so the safest ball is at the top of the list.
     expect(order.indexOf('Letty')).toBeLessThan(order.indexOf('Datto'))
@@ -244,7 +267,7 @@ describe('the pass target list', () => {
     mate.y = carrier.y
     menu.update(state)
 
-    press('2')
+    pick(2)
     const row = labels().indexOf('Letty')
     expect(details()[row]).toContain('25m')
   })
@@ -253,7 +276,7 @@ describe('the pass target list', () => {
 describe('choosing how many to break past', () => {
   it('offers standing pat, then each defender in turn', () => {
     openMenu('contested')
-    press('1')
+    pick(1)
     // One defender in the fixture. FFX names them rather than counting, which
     // is only possible because at most two ever engage.
     expect(labels()).toEqual(['No Break', 'Break to Doram'])
@@ -267,7 +290,7 @@ describe('choosing how many to break past', () => {
       { id: 'away:balgerda', attack: 9, block: 8 },
     ]
     menu.update(state)
-    press('1')
+    pick(1)
 
     // Breaking to the second means going through the first as well.
     expect(labels()).toEqual(['No Break', 'Break to Doram', 'Break to Doram & Balgerda'])
@@ -275,8 +298,8 @@ describe('choosing how many to break past', () => {
 
   it('commits the break at the depth chosen', () => {
     openMenu('contested', 'home:wakka', 40)
-    press('1')
-    press('2')
+    pick(1)
+    pick(2)
     expect(onAction).toHaveBeenCalledWith({ kind: 'breakthrough', breakPast: 1 })
   })
 
@@ -288,7 +311,7 @@ describe('choosing how many to break past', () => {
       { id: 'away:balgerda', attack: 9, block: 8 },
     ]
     menu.update(state)
-    press('1')
+    pick(1)
 
     // Beating one leaves the other still blocking; beating both frees them.
     expect(details()[1]).toContain('costs EN')
@@ -299,20 +322,20 @@ describe('choosing how many to break past', () => {
   it('will not offer a challenge the carrier cannot survive at all', () => {
     // Endurance below even the best case of the tackle waiting for them.
     openMenu('contested', 'home:wakka', 2)
-    press('1')
+    pick(1)
     expect(buttons()[1]!.disabled).toBe(true)
   })
 
   it('offers it when there is endurance to spare', () => {
     openMenu('contested', 'home:wakka', 40)
-    press('1')
+    pick(1)
     expect(buttons()[1]!.disabled).toBe(false)
   })
 
   it('backs out to the action list rather than committing anything', () => {
     openMenu('contested')
-    press('1')
-    press('1')
+    pick(1)
+    pick(1)
     expect(onAction).not.toHaveBeenCalled()
     expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
   })
@@ -321,14 +344,14 @@ describe('choosing how many to break past', () => {
 describe('the technique step', () => {
   it('lists the plain action first, then what the player knows', () => {
     openMenu('contested')
-    press('3')
+    pick(3)
     // Wakka knows Venom Shot.
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
   })
 
   it('prices each option in HP', () => {
     openMenu('contested')
-    press('3')
+    pick(3)
     const venom = findTechnique('venom-shot')
     expect(details()[0]).toContain(`${ACTION_HP_COST.shoot} HP`)
     expect(details()[1]).toContain(`${ACTION_HP_COST.shoot + venom.hpCost} HP`)
@@ -336,15 +359,15 @@ describe('the technique step', () => {
 
   it('commits the plain action', () => {
     openMenu('contested')
-    press('3')
-    press('1')
+    pick(3)
+    pick(1)
     expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
   })
 
   it('commits the technique', () => {
     openMenu('contested')
-    press('3')
-    press('2')
+    pick(3)
+    pick(2)
     expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot' })
   })
 
@@ -353,11 +376,14 @@ describe('the technique step', () => {
     find(state, 'home:wakka').hp = 1
     menu.update(state)
 
-    press('3')
+    pick(3)
     expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
     expect(buttons()[1]!.disabled).toBe(true)
 
-    press('2')
+    // It cannot even be highlighted, and clicking it does nothing either.
+    press('ArrowDown')
+    expect(selectedLabel()).toBe('Straight shot')
+    click(1)
     expect(onAction).not.toHaveBeenCalled()
   })
 
@@ -365,14 +391,14 @@ describe('the technique step', () => {
     // Letty knows only a tackle technique, so shooting has nothing to offer
     // and the row commits straight away.
     openMenu('contested', 'home:letty')
-    press('3')
+    pick(3)
     expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: null })
   })
 
   it('passes straight through for a player with no pass techniques', () => {
     openMenu('contested', 'home:letty')
-    press('2')
-    press('1')
+    pick(2)
+    pick(1)
 
     expect(onAction).toHaveBeenCalledTimes(1)
     const action = onAction.mock.calls[0]![0] as EncounterAction
@@ -383,14 +409,14 @@ describe('the technique step', () => {
 describe('remembering the pass target', () => {
   it('sends the ball to the teammate that was chosen, not the first one', () => {
     openMenu('contested')
-    press('2')
+    pick(2)
 
     // Pick the third name on the list, then a technique, and check the ball
     // still goes to that player rather than whoever the rows were rebuilt with.
     const chosen = labels()[2]
-    press('3')
+    pick(3)
     // Then the technique, which is now the only step left.
-    press('1')
+    pick(1)
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
     expect(action.kind).toBe('pass')
@@ -402,10 +428,10 @@ describe('remembering the pass target', () => {
 
   it('keeps the target when a technique is chosen', () => {
     openMenu('contested')
-    press('2')
+    pick(2)
     const chosen = labels()[1]
-    press('2')
-    press('2')
+    pick(2)
+    pick(2)
 
     const action = onAction.mock.calls[0]![0] as EncounterAction
     if (action.kind === 'pass') {
@@ -426,7 +452,7 @@ describe('after a break lands', () => {
     ]
     menu.update(state)
 
-    press('1')
+    pick(1)
     expect(labels()).toContain('Break to Doram')
 
     // The engine resolves the break and leaves the encounter open against one.
@@ -439,7 +465,7 @@ describe('after a break lands', () => {
 
   it('forgets a pass target chosen before the break', () => {
     const state = openMenu('contested', 'home:wakka', 40)
-    press('2')
+    pick(2)
     expect(labels()).toContain('Tidus')
 
     if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
@@ -453,10 +479,10 @@ describe('after a break lands', () => {
 describe('going back', () => {
   it('steps back through each question in turn', () => {
     openMenu('contested')
-    press('2')
+    pick(2)
     expect(labels()).toContain('Tidus')
 
-    press('1')
+    pick(1)
     expect(labels()).toContain('Straight pass')
 
     press('Escape')
@@ -468,7 +494,7 @@ describe('going back', () => {
 
   it('steps back out of the break question without committing one', () => {
     openMenu('contested')
-    press('1')
+    pick(1)
     expect(labels()).toContain('No Break')
 
     press('Escape')
@@ -478,7 +504,7 @@ describe('going back', () => {
 
   it('steps from the targets back to the actions', () => {
     openMenu('contested')
-    press('2')
+    pick(2)
     press('Escape')
     expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
   })
@@ -491,7 +517,7 @@ describe('going back', () => {
 
   it('offers that as a visible row too', () => {
     openMenu('onTheBall')
-    press('3')
+    pick(3)
     expect(onCancel).toHaveBeenCalled()
     expect(onAction).not.toHaveBeenCalled()
   })
@@ -520,20 +546,103 @@ describe('going back', () => {
   })
 })
 
+describe('moving through the options', () => {
+  const selected = () =>
+    element.querySelector('.enc-option.enc-selected')?.querySelector('.enc-label')?.textContent
+
+  it('starts on the first option', () => {
+    openMenu('contested')
+    expect(selected()).toBe('Breakthrough')
+  })
+
+  it('moves down and up with the arrows', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    expect(selected()).toBe('Pass')
+
+    press('ArrowDown')
+    expect(selected()).toBe('Shoot')
+
+    press('ArrowUp')
+    expect(selected()).toBe('Pass')
+  })
+
+  it('wraps at both ends, since the list is short', () => {
+    openMenu('contested')
+    press('ArrowUp')
+    expect(selected()).toBe('Shoot')
+
+    press('ArrowDown')
+    expect(selected()).toBe('Breakthrough')
+  })
+
+  it('confirms with space', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowDown')
+    press(' ')
+    // Wakka knows a shot technique, so confirming Shoot asks which one.
+    expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
+
+    press('ArrowDown')
+    press(' ')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot' })
+  })
+
+  it('confirms with enter as well', () => {
+    openMenu('contested')
+    press('Enter')
+    // Breakthrough asks how many, rather than committing.
+    expect(labels()).toContain('No Break')
+  })
+
+  it('starts each new question on its first option', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowDown')
+    expect(selected()).toBe('Shoot')
+
+    press(' ')
+    // A fresh list, so the highlight is at the top of it rather than at row three.
+    expect(selected()).toBe('Straight shot')
+  })
+
+  it('skips an option that cannot be chosen', () => {
+    const state = openMenu('contested')
+    find(state, 'home:wakka').hp = 1
+    menu.update(state)
+
+    pick(3)
+    // Venom Shot is unaffordable, so the highlight will not land on it.
+    expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
+    expect(buttons()[1]!.disabled).toBe(true)
+
+    press('ArrowDown')
+    expect(selected()).toBe('Straight shot')
+  })
+
+  it('does nothing on an empty list rather than hanging', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowUp')
+    expect(selected()).toBe('Breakthrough')
+  })
+})
+
 describe('keyboard hygiene', () => {
   it('ignores keys once the menu has closed', () => {
     const state = openMenu('contested')
     state.phase = { kind: 'play' }
     menu.update(state)
 
-    press('1')
+    pick(1)
     expect(onAction).not.toHaveBeenCalled()
   })
 
   it('stops listening after dispose', () => {
     openMenu('contested')
     menu.dispose()
-    press('1')
+    pick(1)
     expect(onAction).not.toHaveBeenCalled()
   })
 })
