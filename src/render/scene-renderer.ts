@@ -244,12 +244,22 @@ export class SceneRenderer {
     this.scene.add(halfway)
   }
 
-  /** Goals are rings standing in the plane of play, as they are in FFX. */
+  /**
+   * Goals are hoops you shoot through, standing across the length of the pitch.
+   *
+   * Shaped as FFX's are: a triangle pointing downwards with generously rounded
+   * corners, rather than a plain ring. The netting behind it is gone — at this
+   * scale a wireframe hemisphere read as a smudge rather than a net.
+   */
   private buildGoal(side: Side): void {
-    const x = goalLineX(side)
-
     const hoop = new THREE.Mesh(
-      new THREE.TorusGeometry(GOAL_HALF_HEIGHT, 0.55, 12, 40),
+      new THREE.TubeGeometry(
+        roundedTriangle(GOAL_HALF_HEIGHT * 1.25, GOAL_HALF_HEIGHT * 0.42),
+        128,
+        0.6,
+        12,
+        true,
+      ),
       new THREE.MeshStandardMaterial({
         color: COLOURS.goal,
         emissive: COLOURS.goal,
@@ -257,24 +267,10 @@ export class SceneRenderer {
         roughness: 0.4,
       }),
     )
-    hoop.position.set(x, 0, 0)
+    hoop.position.set(goalLineX(side), 0, 0)
+    // Built facing the camera; turn it to face along the length of the pitch.
     hoop.rotation.y = Math.PI / 2
     this.scene.add(hoop)
-
-    const net = new THREE.Mesh(
-      new THREE.SphereGeometry(GOAL_HALF_HEIGHT, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: COLOURS.goal,
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-        wireframe: true,
-      }),
-    )
-    net.position.set(x, 0, 0)
-    // Open end towards the pitch, so the mouth faces play.
-    net.rotation.z = side === 'left' ? -Math.PI / 2 : Math.PI / 2
-    this.scene.add(net)
   }
 
   private drawPlayer(state: MatchState, player: Player, alpha: number): void {
@@ -420,4 +416,36 @@ function threatenedGoalX(state: MatchState): number {
   const carrier = carrierOf(state)
   const defending = carrier ? opponentOf(carrier.team) : opponentOf(USER_TEAM)
   return goalLineX(state.teams[defending].defending)
+}
+
+/**
+ * A triangle pointing downwards with rounded corners, as a closed curve.
+ *
+ * Each corner is a quadratic bezier whose control point is the sharp vertex it
+ * replaces. That meets both edges smoothly for far less arithmetic than
+ * constructing tangent arcs, and at this size the two are indistinguishable.
+ */
+function roundedTriangle(radius: number, corner: number): THREE.CurvePath<THREE.Vector3> {
+  // Point down: one vertex at the bottom, two across the top, as FFX has it.
+  const vertices = [270, 30, 150].map((degrees) => {
+    const angle = (degrees * Math.PI) / 180
+    return new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)
+  })
+
+  const path = new THREE.CurvePath<THREE.Vector3>()
+
+  for (let i = 0; i < vertices.length; i++) {
+    const previous = vertices[(i + 2) % 3]!
+    const current = vertices[i]!
+    const next = vertices[(i + 1) % 3]!
+
+    const from = current.clone().lerp(previous, corner / current.distanceTo(previous))
+    const to = current.clone().lerp(next, corner / current.distanceTo(next))
+    const nextCorner = next.clone().lerp(current, corner / next.distanceTo(current))
+
+    path.add(new THREE.QuadraticBezierCurve3(from, current, to))
+    path.add(new THREE.LineCurve3(to, nextCorner))
+  }
+
+  return path
 }
