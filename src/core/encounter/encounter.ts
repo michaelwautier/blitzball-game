@@ -37,6 +37,20 @@ import { awardExp } from '../match/exp'
 export const ENGAGE_RADIUS =
   PLAYER_RADIUS * 2.3 * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
 
+/**
+ * Seconds the defenders take to settle in front of the carrier.
+ *
+ * An encounter in FFX is a tableau: the defenders come round in front of the
+ * player on the ball and face them, and the camera reads the confrontation.
+ * Ours simply froze wherever everyone happened to be, which meant a decision
+ * about two specific defenders was often taken while they were beside or behind
+ * the carrier, and nothing on screen said who the menu was talking about.
+ *
+ * Short — they are already within `ENGAGE_RADIUS`, so this is a small adjustment
+ * rather than a swim.
+ */
+export const STAGING_SECONDS = 0.26
+
 /** Seconds an AI carrier appears to deliberate, so its choice is readable. */
 export const AI_THINK_SECONDS = 0.35
 
@@ -114,6 +128,8 @@ export function openEncounter(
   carrier: Player,
   defenders: Player[],
 ): Encounter {
+  stageDefenders(state, carrier, defenders)
+
   return {
     carrierId: carrier.id,
     defenders: defenders.map((d) => ({
@@ -128,6 +144,46 @@ export function openEncounter(
     awaitingDefence: defenders.some((d) => d.team === USER_TEAM),
     defence: null,
   }
+}
+
+/**
+ * Bring the defenders round in front of the carrier.
+ *
+ * They line up between the carrier and the goal being attacked, fanned to one
+ * side of each other so two defenders are two readable bodies rather than one
+ * overlapping blob. Committed as a lunge rather than assigned, so it is a
+ * movement you watch happen and `prevX/prevY` stay honest — the interpolation
+ * bugs of #10 all came from moving bodies without telling the renderer.
+ *
+ * These positions outlive the encounter: a defender staged goal-side is
+ * genuinely better placed when play resumes, which is why this is measured
+ * rather than assumed to be cosmetic.
+ */
+function stageDefenders(state: MatchState, carrier: Player, defenders: Player[]): void {
+  const forward = attackDirection(state.teams[carrier.team].defending)
+  // Fan away from the nearer wall, so nobody is staged outside the pool.
+  const away = carrier.y >= 0 ? -1 : 1
+
+  defenders.forEach((defender, rank) => {
+    const spot = clampToPool(
+      {
+        x: carrier.x + forward * ENGAGE_RADIUS * 0.8,
+        y: carrier.y + away * rank * PLAYER_RADIUS * 2.4,
+      },
+      PLAYER_RADIUS,
+    )
+
+    defender.lunge = {
+      fromX: defender.x,
+      fromY: defender.y,
+      toX: spot.x,
+      toY: spot.y,
+      duration: STAGING_SECONDS,
+      elapsed: 0,
+    }
+    defender.vx = 0
+    defender.vy = 0
+  })
 }
 
 /**

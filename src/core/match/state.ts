@@ -228,6 +228,10 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       break
     case 'encounter':
       holdStill(state)
+      // The world is frozen, but committed movements are not: defenders settling
+      // in front of the carrier, and anyone carried past by a challenge that has
+      // just been made, both play out while the menu is open.
+      advanceLunges(state, dt)
       stepEncounter(state, dt, state.phase.encounter)
       break
     case 'flight': {
@@ -266,6 +270,21 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
  * every single frame. At a fraction of a unit it reads as a shimmer; after a
  * position is set directly, it reads as the body being drawn in two places.
  */
+/**
+ * Advance committed movements, and nothing else.
+ *
+ * Used where play is stopped but a body is mid-flight through a movement it has
+ * already committed to. Without this a partial breakthrough left the beaten
+ * defender hanging motionless at the start of their lunge until the encounter
+ * ended, because lunges are otherwise only stepped inside `movePlayers`.
+ */
+function advanceLunges(state: MatchState, dt: number): void {
+  for (const player of state.players) {
+    if (!player.lunge) continue
+    if (!advanceLunge(player, player.lunge, dt)) player.lunge = null
+  }
+}
+
 function holdStill(state: MatchState): void {
   for (const player of state.players) recordPrevious(player)
   recordPrevious(state.ball)
