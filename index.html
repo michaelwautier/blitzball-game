@@ -226,9 +226,20 @@
         text-align: left;
         cursor: pointer;
       }
-      .enc-option:hover {
-        background: rgb(255 255 255 / 0.11);
+      /* Where the arrow keys are sitting. Hovering moves it too, so the mouse
+         and the keyboard never point at different rows. */
+      .enc-option.enc-selected {
+        background: rgb(127 216 255 / 0.16);
         border-color: var(--edge);
+      }
+      /* FFX marks the choice with a cursor rather than only a highlight. */
+      .enc-option.enc-selected .enc-label::before {
+        content: '▶';
+        margin-right: 6px;
+        margin-left: -14px;
+        font-size: 9px;
+        color: #ffd479;
+        vertical-align: 1px;
       }
       .enc-option kbd {
         grid-row: 1 / span 2;

@@ -175,9 +175,11 @@ against the ladder alone.
    hanging motionless mid-lunge after a partial break. Measured: 2.27 to 2.37 goals a match
    with encounters unmoved. Labels became distance-scaled in the same change, since the closer
    camera turned a nearby player's name into a quarter of the screen.
-6. **Arrow-key selection.** Move through the encounter options with the arrow keys and confirm
-   with space or enter, rather than hitting the number of the row. The number keys stay as a
-   shortcut. UI only.
+6. **Arrow-key selection** ✅ (#36). Move through the encounter options with the arrows and
+   confirm with space or enter; the number keys stay as a direct shortcut, and hovering moves
+   the highlight so mouse and keyboard never point at different rows. Wraps at both ends and
+   skips options that cannot be chosen — an unaffordable technique stays visible, because that
+   is information, but holding an arrow never gets stuck on it. UI only.
 7. **Make defending feel like defending.** `engageCooldown` is a single global timer, so every
    reception and every completed throw blacks out *all* encounters for four seconds — and on
    top of that, attacking has an override that defending does not: `requestActionMenu` (the

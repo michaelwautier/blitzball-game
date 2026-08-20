@@ -442,7 +442,13 @@ const LABEL_HEIGHT = 3.5
 
 /** The distance labels are sized for; nearer or further, they are scaled to match. */
 const LABEL_REFERENCE_DISTANCE = POOL_RADIUS * 0.62
-const LABEL_MIN_SCALE = 0.55
+/**
+ * Low, deliberately. The floor applies to players *near* the camera — their
+ * label needs to be small in the world to come out ordinary on screen — so a
+ * generous floor is exactly what leaves a nearby name filling the frame.
+ */
+const LABEL_MIN_SCALE = 0.18
+/** The ceiling applies to distant players, and only stops labels growing absurdly. */
 const LABEL_MAX_SCALE = 1.9
 
 function clamp(value: number, low: number, high: number): number {

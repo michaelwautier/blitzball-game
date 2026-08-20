@@ -520,6 +520,95 @@ describe('going back', () => {
   })
 })
 
+describe('moving through the options', () => {
+  const selected = () =>
+    element.querySelector('.enc-option.enc-selected')?.querySelector('.enc-label')?.textContent
+
+  it('starts on the first option', () => {
+    openMenu('contested')
+    expect(selected()).toBe('Breakthrough')
+  })
+
+  it('moves down and up with the arrows', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    expect(selected()).toBe('Pass')
+
+    press('ArrowDown')
+    expect(selected()).toBe('Shoot')
+
+    press('ArrowUp')
+    expect(selected()).toBe('Pass')
+  })
+
+  it('wraps at both ends, since the list is short', () => {
+    openMenu('contested')
+    press('ArrowUp')
+    expect(selected()).toBe('Shoot')
+
+    press('ArrowDown')
+    expect(selected()).toBe('Breakthrough')
+  })
+
+  it('confirms with space', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowDown')
+    press(' ')
+    // Wakka knows a shot technique, so confirming Shoot asks which one.
+    expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
+
+    press('ArrowDown')
+    press(' ')
+    expect(onAction).toHaveBeenCalledWith({ kind: 'shoot', techniqueId: 'venom-shot' })
+  })
+
+  it('confirms with enter as well', () => {
+    openMenu('contested')
+    press('Enter')
+    // Breakthrough asks how many, rather than committing.
+    expect(labels()).toContain('No Break')
+  })
+
+  it('leaves the number keys working as a shortcut', () => {
+    openMenu('contested')
+    press('3')
+    expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
+  })
+
+  it('starts each new question on its first option', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowDown')
+    expect(selected()).toBe('Shoot')
+
+    press(' ')
+    // A fresh list, so the highlight is at the top of it rather than at row three.
+    expect(selected()).toBe('Straight shot')
+  })
+
+  it('skips an option that cannot be chosen', () => {
+    const state = openMenu('contested')
+    find(state, 'home:wakka').hp = 1
+    menu.update(state)
+
+    press('3')
+    // Venom Shot is unaffordable, so the highlight will not land on it.
+    expect(labels()).toEqual(['Straight shot', 'Venom Shot'])
+    expect(buttons()[1]!.disabled).toBe(true)
+
+    press('ArrowDown')
+    expect(selected()).toBe('Straight shot')
+  })
+
+  it('does nothing on an empty list rather than hanging', () => {
+    openMenu('contested')
+    press('ArrowDown')
+    press('ArrowUp')
+    expect(selected()).toBe('Breakthrough')
+  })
+})
+
 describe('keyboard hygiene', () => {
   it('ignores keys once the menu has closed', () => {
     const state = openMenu('contested')

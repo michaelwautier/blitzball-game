@@ -62,6 +62,8 @@ export class EncounterMenu {
   private rows: Row[] = []
   private pendingTargetId: string | null = null
   private encounterKind: Encounter['kind'] = 'contested'
+  /** Which row the arrow keys are sitting on. */
+  private selected = 0
   /** Who was on the carrier at the last render, to notice a break landing. */
   private lastDefenders = ''
 
@@ -70,6 +72,7 @@ export class EncounterMenu {
     private readonly handlers: EncounterMenuHandlers,
   ) {
     this.element.addEventListener('click', this.onClick)
+    this.element.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('keydown', this.onKeyDown)
   }
 
@@ -119,6 +122,7 @@ export class EncounterMenu {
 
   dispose(): void {
     this.element.removeEventListener('click', this.onClick)
+    this.element.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('keydown', this.onKeyDown)
   }
 
@@ -155,6 +159,7 @@ export class EncounterMenu {
     this.rows = []
     this.pendingTargetId = null
     this.lastDefenders = ''
+    this.selected = 0
     this.encounterKind = 'contested'
   }
 
@@ -166,6 +171,9 @@ export class EncounterMenu {
 
     this.encounterKind = encounter.kind
     this.rows = this.buildRows(state, carrier, encounter)
+    // A new question starts on its first real answer rather than wherever the
+    // highlight happened to be on the last one.
+    this.selected = this.firstEnabled()
 
     const list = document.createElement('ul')
     list.className = 'enc-list'
@@ -173,7 +181,9 @@ export class EncounterMenu {
 
     const hint = document.createElement('div')
     hint.className = 'enc-hint'
-    hint.textContent = `Press 1–${this.rows.length}${this.canGoBack() ? ', Esc to go back' : ''}`
+    hint.textContent =
+      `↑↓ choose · space to confirm · 1–${this.rows.length} direct` +
+      (this.canGoBack() ? ' · Esc back' : '')
 
     this.element.replaceChildren(
       this.renderHeading(state, carrier, encounter),
@@ -181,6 +191,7 @@ export class EncounterMenu {
       list,
       hint,
     )
+    this.paintSelection()
   }
 
   private renderHeading(state: MatchState, carrier: Player, encounter: Encounter): HTMLElement {
@@ -498,6 +509,18 @@ export class EncounterMenu {
     return !(this.mode === 'passTargets' && this.encounterKind === 'distribution')
   }
 
+  /** Hovering moves the highlight, so mouse and keyboard never disagree. */
+  private readonly onPointerMove = (event: PointerEvent) => {
+    const button = (event.target as HTMLElement).closest<HTMLElement>('.enc-option')
+    if (!button?.dataset.key) return
+
+    const index = Number(button.dataset.key) - 1
+    if (index === this.selected || !this.rows[index]?.enabled) return
+
+    this.selected = index
+    this.paintSelection()
+  }
+
   private readonly onClick = (event: MouseEvent) => {
     const button = (event.target as HTMLElement).closest<HTMLElement>('.enc-option')
     if (!button?.dataset.key) return
@@ -513,11 +536,59 @@ export class EncounterMenu {
       return
     }
 
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      this.move(event.key === 'ArrowDown' ? 1 : -1)
+      event.preventDefault()
+      return
+    }
+
+    // Space would otherwise scroll the page, and Enter is the other habit.
+    if (event.key === ' ' || event.key === 'Enter') {
+      this.choose(this.selected + 1)
+      event.preventDefault()
+      return
+    }
+
     const key = Number(event.key)
     if (Number.isInteger(key) && key >= 1 && key <= 9) {
       this.choose(key)
       event.preventDefault()
     }
+  }
+
+  /**
+   * Move the highlight, skipping anything that cannot be chosen.
+   *
+   * Wraps at both ends, which matters more than it sounds: these lists are short
+   * and the row you want is as often the last as the first. Disabled rows stay
+   * visible — a technique you cannot afford is information — but the highlight
+   * does not stop on them, so holding an arrow never gets stuck.
+   */
+  private move(step: number): void {
+    const count = this.rows.length
+    if (count === 0) return
+
+    for (let tried = 1; tried <= count; tried++) {
+      const next = (this.selected + step * tried + count * count) % count
+      if (this.rows[next]?.enabled) {
+        this.selected = next
+        this.paintSelection()
+        return
+      }
+    }
+  }
+
+  /** The first row worth landing on, for when the question changes. */
+  private firstEnabled(): number {
+    const index = this.rows.findIndex((row) => row.enabled)
+    return index < 0 ? 0 : index
+  }
+
+  /** Move the highlight without rebuilding the list. */
+  private paintSelection(): void {
+    this.element.querySelectorAll('.enc-option').forEach((button, index) => {
+      button.classList.toggle('enc-selected', index === this.selected)
+    })
   }
 
   private goBack(): void {
