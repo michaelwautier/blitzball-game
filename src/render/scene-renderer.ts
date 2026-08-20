@@ -55,6 +55,19 @@ const DEPTH_FOLLOW = 0.35
 const CAMERA_EASE = 0.5
 
 /**
+ * How far out the camera may go, as a fraction of the pool.
+ *
+ * The camera has to stay in the water. Following play into a corner used to
+ * carry it through the wall, and from outside you are looking at a sphere
+ * hanging in a black void with the far side of it cutting across the frame —
+ * play half hidden behind its own pool.
+ */
+const CAMERA_CONFINE = 0.9
+
+/** Markings draw after the water, so the pitch is never lost inside its own pool. */
+const MARKINGS_ORDER = 1
+
+/**
  * The pool in three dimensions.
  *
  * The simulation stays flat — this draws its plane inside a sphere of water and
@@ -168,6 +181,7 @@ export class SceneRenderer {
       0,
       focus.z * DEPTH_FOLLOW - POOL_RADIUS * 0.1,
     )
+    confineToPool(this.cameraGoal)
 
     if (!this.started) {
       // Do not sweep in from wherever the camera was constructed.
@@ -211,6 +225,11 @@ export class SceneRenderer {
         transparent: true,
         opacity: 0.72,
         roughness: 0.9,
+        // The pool, its markings and its surface are all centred on the origin,
+        // so three.js has no meaningful distance to sort them by and the order
+        // is effectively arbitrary. Writing depth from the water meant it could
+        // cull the markings behind it depending on which happened to draw first.
+        depthWrite: false,
       }),
     )
     this.scene.add(inner)
@@ -224,6 +243,7 @@ export class SceneRenderer {
         roughness: 0.15,
         metalness: 0,
         side: THREE.FrontSide,
+        depthWrite: false,
       }),
     )
     this.scene.add(shell)
@@ -241,6 +261,7 @@ export class SceneRenderer {
       new THREE.BoxGeometry(0.3, 0.05, POOL_RADIUS * 2),
       new THREE.MeshBasicMaterial({ color: COLOURS.markings, transparent: true, opacity: 0.28 }),
     )
+    halfway.renderOrder = MARKINGS_ORDER
     this.scene.add(halfway)
   }
 
@@ -368,6 +389,7 @@ function ring(radius: number, thickness: number, colour: number, opacity: number
   )
   // A torus is built standing up; lay it down onto the plane of play.
   mesh.rotation.x = -Math.PI / 2
+  mesh.renderOrder = MARKINGS_ORDER
   return mesh
 }
 
@@ -451,4 +473,18 @@ function roundedTriangle(radius: number, corner: number): THREE.CurvePath<THREE.
   }
 
   return path
+}
+
+/**
+ * Pull a camera position back inside the pool.
+ *
+ * Projected straight back along its own line from the centre, so the direction
+ * it was looking from is preserved and it simply comes in closer rather than
+ * swinging round to somewhere else.
+ */
+export function confineToPool(position: THREE.Vector3): void {
+  const limit = POOL_RADIUS * CAMERA_CONFINE
+  const distance = position.length()
+  if (distance <= limit || distance === 0) return
+  position.multiplyScalar(limit / distance)
 }
