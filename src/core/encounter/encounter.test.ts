@@ -138,8 +138,7 @@ describe('how much blocking gets counted', () => {
       carrier.hp = carrier.def.stats.hp
       return resolveEncounter(state, { ...encounter, endurance: 1000 }, {
         kind: 'shoot',
-        techniqueId: null,
-        breakPast: 0,
+        techniqueId: null
       })
     })
     return { range, results }
@@ -195,7 +194,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 100
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     expect(result.success).toBe(true)
     expect(state.ball.carrier).toBe(carrier.id)
@@ -209,7 +208,7 @@ describe('breakthrough', () => {
     encounter.endurance = 100
 
     const { min, max } = tackleRange(encounter.defenders)
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     // Each tackle is rolled when it is made, so the drain lands somewhere in the
     // range the menu advertised rather than on an exact figure.
@@ -223,7 +222,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 100
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     // Two defenders, so two subtractions in the summary.
     expect(result.summary.match(/−/g)).toHaveLength(2)
@@ -235,7 +234,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     // The first tackle takes it; the others never needed to commit.
     expect(result.success).toBe(false)
@@ -249,7 +248,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engaged)
     encounter.endurance = 1
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     // Closest defender tackles first, so with one point of endurance it is theirs.
     expect(state.ball.carrier).toBe(engaged[0]!.id)
@@ -262,7 +261,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engaged)
     encounter.endurance = 100
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     // The challenge is a movement, not a jump: they are still in front at the
     // moment it is committed.
@@ -284,7 +283,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, [defender])
     encounter.endurance = 100
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     const start = { x: defender.x, y: defender.y }
 
     // Sampled part way through, they are somewhere between the two ends — which
@@ -307,7 +306,7 @@ describe('breakthrough', () => {
     const encounter = openEncounter(state, carrier, engaged)
     encounter.endurance = 100
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     for (const defender of engaged) {
       expect(defender.recovery, defender.def.name).toBeGreaterThan(0)
@@ -367,7 +366,7 @@ describe('breakthrough', () => {
     // against that moment rather than against wherever they end up.
     const dispossessedAt = carrier.x
 
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     for (let i = 0; i < Math.ceil(LUNGE_SECONDS * 60) + 2; i++) stepMatch(state, 1 / 60)
 
     expect(state.ball.carrier).toBe(engaged[0]!.id)
@@ -381,7 +380,7 @@ describe('breakthrough', () => {
     encounter.endurance = 1
 
     const strongest = encounter.defenders.reduce((best, d) => (d.attack > best.attack ? d : best))
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(strongest.id)
@@ -393,7 +392,7 @@ describe('breakthrough', () => {
     const carrier = setUpEncounter(state, 'home:tidus', 3)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 1
-    resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     expect(state.endurance).toBeGreaterThanOrEqual(0)
   })
 
@@ -404,129 +403,151 @@ describe('breakthrough', () => {
     encounter.endurance = 30
     const attack = encounter.defenders[0]!.attack
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     expect(result.summary).toMatch(/^EN 30 − \d+ = -?\d+/)
     expect(attack).toBeGreaterThan(0)
   })
 })
 
-describe('clearing defenders before a throw', () => {
-  it('takes nobody on when asked for none', () => {
-    const state = newMatch('clear-none')
+describe('breaking past some of them', () => {
+  /** A carrier with two on them and endurance to spare. */
+  const twoOn = (seed: string, endurance = 300) => {
+    const state = newMatch(seed)
     const carrier = setUpEncounter(state, 'home:wakka', 2)
     const engaged = engagingDefenders(state, carrier)
     const encounter = openEncounter(state, carrier, engaged)
+    encounter.endurance = endurance
+    state.endurance = endurance
+    return { state, carrier, engaged, encounter }
+  }
 
-    const result = resolveEncounter(state, encounter, {
-      kind: 'pass',
-      targetId: 'home:tidus',
-      techniqueId: null,
-      breakPast: 0,
-    })
+  it('leaves the carrier still caught, by whoever was not challenged', () => {
+    const { state, encounter } = twoOn('partial')
+    const second = encounter.defenders[1]!
 
-    // No challenge happened, so no endurance arithmetic appears and nobody was
-    // carried past. Checking the summary rather than the endurance figure, which
-    // is reset by whoever ends up with the ball.
-    expect(result.summary).not.toContain('EN ')
-    for (const defender of engaged) expect(defender.lunge).toBeNull()
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+
+    expect(result.success).toBe(true)
+    expect(result.continues).toBe(true)
+    // Still an encounter, and now only the one who was left out of it.
+    expect(encounter.defenders).toEqual([second])
   })
 
-  it('spends endurance on the ones it does take on', () => {
-    const state = newMatch('clear-one')
-    const carrier = setUpEncounter(state, 'home:wakka', 2)
-    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
-    encounter.endurance = 200
-    state.endurance = 200
+  it('frees the carrier only once everyone has been beaten', () => {
+    const { state, encounter } = twoOn('all')
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
 
-    const result = resolveEncounter(state, encounter, {
-      kind: 'pass',
-      targetId: 'home:tidus',
-      techniqueId: null,
-      breakPast: 1,
-    })
+    expect(result.success).toBe(true)
+    expect(result.continues).toBeFalsy()
+    expect(state.engageCooldown).toBeGreaterThan(0)
+  })
 
-    // One challenge, reported with its arithmetic, and the drain lands inside
-    // the range that defender could have rolled.
+  it('carries only the defenders it took on past the carrier', () => {
+    const { state, engaged, encounter } = twoOn('lunge')
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+
+    // The one challenged is on their way past; the one left alone has not moved.
+    expect(engaged[0]!.lunge).not.toBeNull()
+    expect(engaged[1]!.lunge).toBeNull()
+    expect(engaged[1]!.recovery).toBe(0)
+  })
+
+  it('spends endurance only on the challenge it actually made', () => {
+    const { state, encounter } = twoOn('cost', 200)
+    const one = tackleRange(encounter.defenders.slice(0, 1))
+
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+
     const spent = result.summary.match(/^EN 200 − (\d+) =/)
     expect(spent, result.summary).not.toBeNull()
-
-    const { min, max } = tackleRange(encounter.defenders.slice(0, 1))
-    expect(Number(spent![1])).toBeGreaterThanOrEqual(min)
-    expect(Number(spent![1])).toBeLessThanOrEqual(max)
+    expect(Number(spent![1])).toBeGreaterThanOrEqual(one.min)
+    expect(Number(spent![1])).toBeLessThanOrEqual(one.max)
   })
 
-  it('leaves a throw facing only the defenders still standing', () => {
-    const state = newMatch('clear-all')
+  it('carries the shortened endurance into the decision that follows', () => {
+    const { state, encounter } = twoOn('carry-en', 200)
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+
+    // Whatever survived the challenge is what the next choice is made against.
+    expect(encounter.endurance).toBe(state.endurance)
+    expect(encounter.endurance).toBeLessThan(200)
+  })
+
+  it('loses the ball outright when the challenge takes the endurance', () => {
+    const { state, encounter } = twoOn('lost', 1)
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+
+    expect(result.success).toBe(false)
+    expect(result.continues).toBeFalsy()
+    expect(result.summary).toContain('tackled by')
+    const holder = state.players.find((p) => p.id === state.ball.carrier)
+    expect(holder?.team).toBe('away')
+  })
+
+  it('names who was beaten, so the summary says what happened', () => {
+    const { state, engaged, encounter } = twoOn('named')
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+    expect(result.summary).toContain(engaged[0]!.def.name)
+  })
+
+  it('takes on at least one, and never more than are there', () => {
+    for (const asked of [0, -3, 99]) {
+      const { state, encounter } = twoOn(`clamp-${asked}`)
+      expect(() =>
+        resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: asked }),
+      ).not.toThrow()
+    }
+  })
+})
+
+describe('a throw faces whoever is still on the carrier', () => {
+  it('is contested by the defenders who remain', () => {
+    const state = newMatch('throw-contested')
     const carrier = setUpEncounter(state, 'home:wakka', 2)
-    const engaged = engagingDefenders(state, carrier)
-    const encounter = openEncounter(state, carrier, engaged)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    carrier.stats.pa = 1
+
+    // A pass with nothing behind it cannot survive two blockers.
+    const result = resolveEncounter(state, encounter, {
+      kind: 'pass',
+      targetId: 'home:tidus',
+      techniqueId: null,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('flies once the carrier has broken past everyone', () => {
+    const state = newMatch('throw-clear')
+    const carrier = setUpEncounter(state, 'home:wakka', 2)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 300
     state.endurance = 300
 
-    // Everyone cleared, so nothing is left to cut the ball out and it flies
-    // regardless of how weak the pass would otherwise have been.
+    // Break past both, then throw: nobody is left to cut it out.
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     const result = resolveEncounter(state, encounter, {
       kind: 'pass',
       targetId: 'home:tidus',
       techniqueId: null,
-      breakPast: engaged.length,
     })
 
     expect(result.success).toBe(true)
     expect(state.phase.kind).toBe('flight')
   })
 
-  it('carries the cleared defenders past, as a breakthrough does', () => {
-    const state = newMatch('clear-lunge')
-    const carrier = setUpEncounter(state, 'home:wakka', 2)
-    const engaged = engagingDefenders(state, carrier)
-    const encounter = openEncounter(state, carrier, engaged)
-    encounter.endurance = 300
-    state.endurance = 300
-
-    resolveEncounter(state, encounter, {
-      kind: 'shoot',
-      techniqueId: null,
-      breakPast: 1,
-    })
-
-    expect(engaged[0]!.lunge).not.toBeNull()
-    expect(engaged[0]!.recovery).toBeGreaterThan(0)
-    // The one that was not taken on is untouched.
-    expect(engaged[1]!.lunge).toBeNull()
-  })
-
-  it('never makes the throw if the ball is lost on the way', () => {
-    const state = newMatch('clear-fail')
+  it('spends no endurance of its own', () => {
+    // Breaking is where endurance goes now; throwing is not a challenge.
+    const state = newMatch('throw-free')
     const carrier = setUpEncounter(state, 'home:wakka', 2)
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
-    encounter.endurance = 1
-    state.endurance = 1
+    encounter.endurance = 300
+    state.endurance = 300
 
     const result = resolveEncounter(state, encounter, {
       kind: 'shoot',
       techniqueId: null,
-      breakPast: 2,
     })
-
-    expect(result.success).toBe(false)
-    expect(result.summary).toContain('tackled by')
-    expect(state.phase.kind).not.toBe('flight')
-    // The ball is with a defender, not in the air.
-    const holder = state.players.find((p) => p.id === state.ball.carrier)
-    expect(holder?.team).toBe('away')
-  })
-
-  it('ignores a count beyond the defenders actually there', () => {
-    const state = newMatch('clear-too-many')
-    const carrier = setUpEncounter(state, 'home:wakka', 1)
-    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
-    encounter.endurance = 300
-    state.endurance = 300
-
-    expect(() =>
-      resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null, breakPast: 9 }),
-    ).not.toThrow()
+    expect(result.summary).not.toContain('EN ')
   })
 })
 
@@ -537,7 +558,7 @@ describe('pass and shoot', () => {
     // Nobody engaged, so nothing subtracts from the throw and it definitely flies.
     const encounter = openEncounter(state, carrier, [])
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null, breakPast: 0 })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'home:wakka', techniqueId: null })
 
     expect(result.success).toBe(true)
     expect(state.ball.carrier).toBeNull()
@@ -553,7 +574,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:tidus', 0)
     const encounter = openEncounter(state, carrier, [])
 
-    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null, breakPast: 0 })
+    const result = resolveEncounter(state, encounter, { kind: 'pass', targetId: 'away:bickson', techniqueId: null })
 
     expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(carrier.id)
@@ -565,7 +586,7 @@ describe('pass and shoot', () => {
     const carrier = setUpEncounter(state, 'home:wakka', 0)
     const encounter = openEncounter(state, carrier, [])
 
-    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null, breakPast: 0 })
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId: null })
 
     expect(state.phase.kind).toBe('flight')
     if (state.phase.kind === 'flight') {
@@ -581,7 +602,7 @@ describe('pass and shoot', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.carrierId = 'nobody'
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough' })
+    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     expect(result.success).toBe(false)
   })
 })

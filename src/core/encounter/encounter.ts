@@ -254,7 +254,7 @@ export function resolveEncounter(
 
   switch (action.kind) {
     case 'breakthrough':
-      return resolveBreakthrough(state, encounter, carrier)
+      return resolveBreakthrough(state, encounter, carrier, action)
     case 'pass':
       return resolvePass(state, encounter, carrier, action)
     case 'shoot':
@@ -282,6 +282,8 @@ interface Challenge {
   rolls: number[]
   /** Whoever took the endurance to zero, if anyone did. */
   tackler: Player | undefined
+  /** Everyone who put a challenge in, in the order they made it. */
+  beaten: Player[]
 }
 
 /**
@@ -324,7 +326,7 @@ function challengeDefenders(
   // it, whether or not they came away with the ball.
   pushPastCarrier(state, beaten, carrier)
 
-  return { endurance, rolls, tackler }
+  return { endurance, rolls, tackler, beaten }
 }
 
 /** "EN 14 − 6 − 5 = 3", the arithmetic laid out as it happened. */
@@ -345,19 +347,45 @@ function concedePossession(
   return `tackled by ${tackler.def.name}${technique ? ` · ${technique.name}!` : ''}`
 }
 
+/**
+ * Take on the nearest `breakPast` defenders.
+ *
+ * Beating all of them is a breakthrough in the old sense: the carrier is free
+ * and play resumes. Beating some leaves them still caught, by whoever was not
+ * challenged — and the encounter stays open so they can decide again against the
+ * shorter list. There is deliberately no outcome here that returns a carrier to
+ * open water while a defender is still on them.
+ */
 function resolveBreakthrough(
   state: MatchState,
   encounter: Encounter,
   carrier: Player,
+  action: Extract<EncounterAction, { kind: 'breakthrough' }>,
 ): EncounterResult {
+  const count = Math.max(1, Math.min(action.breakPast, encounter.defenders.length))
   spendHp(carrier, ACTION_HP_COST.breakthrough)
 
-  const challenge = challengeDefenders(state, encounter, carrier, encounter.defenders.length)
+  const challenge = challengeDefenders(state, encounter, carrier, count)
   const sums = describeChallenge(encounter.endurance, challenge.rolls, challenge.endurance)
 
-  if (!challenge.tackler) {
+  if (challenge.tackler) {
+    return {
+      action: 'breakthrough',
+      success: false,
+      summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
+    }
+  }
+
+  awardExp(state, carrier, 'breakthrough')
+  // The encounter always reflects who is still on the carrier, even in the
+  // moment it ends: nothing should ever be contested by a defender who has
+  // just been beaten.
+  const survivors = encounter.defenders.slice(count)
+  encounter.defenders = survivors
+  encounter.endurance = state.endurance
+
+  if (survivors.length === 0) {
     state.engageCooldown = BREAKTHROUGH_GRACE
-    awardExp(state, carrier, 'breakthrough')
     return {
       action: 'breakthrough',
       success: true,
@@ -365,11 +393,19 @@ function resolveBreakthrough(
     }
   }
 
+  // Past one, still held by the next. The encounter carries on against them —
+  // and only their blocking counts against whatever comes next.
   return {
     action: 'breakthrough',
-    success: false,
-    summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
+    success: true,
+    continues: true,
+    summary: `${sums} · past ${beatenNames(challenge)}, still held`,
   }
+}
+
+/** The defenders a challenge went through, for the summary line. */
+function beatenNames(challenge: Challenge): string {
+  return challenge.beaten.map((defender) => defender.def.name).join(' & ')
 }
 
 /**
@@ -539,17 +575,14 @@ function resolvePass(
   const technique = affordableTechnique(carrier, action.techniqueId, 'pass')
   spendHp(carrier, ACTION_HP_COST.pass + (technique?.hpCost ?? 0))
 
-  const cleared = clearTheWay(state, encounter, carrier, action.breakPast)
-  if (cleared.lost) return { action: 'pass', success: false, summary: cleared.summary }
-
   const start = effectiveStat(carrier, 'pa') + (technique?.power ?? 0)
-  const contest = contestThrow(state, cleared.remaining, start)
+  const contest = contestThrow(state, encounter.defenders, start)
   const name = technique ? `${technique.name} · ` : ''
-  const sums = `${cleared.summary}${describeThrow('PA', start, contest.rolls, contest.power)}`
+  const sums = describeThrow('PA', start, contest.rolls, contest.power)
 
   // A pass technique's condition lands on everyone who tried to cut it out.
   if (technique?.inflicts) {
-    for (const engaged of cleared.remaining) {
+    for (const engaged of encounter.defenders) {
       const defender = playerById(state, engaged.id)
       if (defender) applyStatus(defender, technique.inflicts)
     }
@@ -585,15 +618,12 @@ function resolveShoot(
   const technique = affordableTechnique(carrier, action.techniqueId, 'shoot')
   spendHp(carrier, ACTION_HP_COST.shoot + (technique?.hpCost ?? 0))
 
-  const cleared = clearTheWay(state, encounter, carrier, action.breakPast)
-  if (cleared.lost) return { action: 'shoot', success: false, summary: cleared.summary }
-
   const start = effectiveStat(carrier, 'sh') + (technique?.power ?? 0)
   // A technique that splits the defence waves that many of the rest through.
-  const facing = cleared.remaining.slice(technique?.ignoresBlockers ?? 0)
+  const facing = encounter.defenders.slice(technique?.ignoresBlockers ?? 0)
   const contest = contestThrow(state, facing, start)
   const name = technique ? `${technique.name}! · ` : ''
-  const sums = `${cleared.summary}${describeThrow('SH', start, contest.rolls, contest.power)}`
+  const sums = describeThrow('SH', start, contest.rolls, contest.power)
 
   if (contest.taker) {
     awardExp(state, contest.taker, 'interception')
@@ -616,35 +646,6 @@ function resolveShoot(
   }
 }
 
-/**
- * Take on the defenders the carrier chose to clear before throwing.
- *
- * The ones beaten drop out of the contest that follows, which is the whole
- * point: endurance spent here is blocking that never gets counted against the
- * throw. Losing the ball on the way means the throw never happens at all.
- */
-function clearTheWay(
-  state: MatchState,
-  encounter: Encounter,
-  carrier: Player,
-  breakPast: number,
-): { lost: boolean; summary: string; remaining: EncounterDefender[] } {
-  const count = Math.max(0, Math.min(breakPast, encounter.defenders.length))
-  if (count === 0) return { lost: false, summary: '', remaining: encounter.defenders }
-
-  const challenge = challengeDefenders(state, encounter, carrier, count)
-  const sums = describeChallenge(encounter.endurance, challenge.rolls, challenge.endurance)
-
-  if (challenge.tackler) {
-    return {
-      lost: true,
-      summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
-      remaining: [],
-    }
-  }
-
-  return { lost: false, summary: `${sums} · `, remaining: encounter.defenders.slice(count) }
-}
 
 /**
  * Resolve a requested technique, or fall back to the plain action.

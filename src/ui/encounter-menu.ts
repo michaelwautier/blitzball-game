@@ -17,7 +17,7 @@ import {
 } from '../core/match/state'
 import { techniquesOf, type Technique } from '../data/techniques'
 
-type Mode = 'defence' | 'actions' | 'passTargets' | 'breakPast' | 'passTechnique' | 'shootTechnique'
+type Mode = 'defence' | 'actions' | 'passTargets' | 'breakthrough' | 'passTechnique' | 'shootTechnique'
 
 interface Row {
   label: string
@@ -31,10 +31,6 @@ interface Row {
     | { defend: string | null }
   /** Set on pass-target rows, so the receiver survives the steps that follow. */
   targetId?: string
-  /** Set on break-past rows, so the count survives the technique step. */
-  breakPast?: number
-  /** Set on the pass and shoot rows, so later steps know which throw is coming. */
-  throwKind?: 'pass' | 'shoot'
   enabled: boolean
 }
 
@@ -65,12 +61,9 @@ export class EncounterMenu {
   private signature = ''
   private rows: Row[] = []
   private pendingTargetId: string | null = null
-  /** Which throw the break-past step is feeding into. */
-  private pendingThrow: 'pass' | 'shoot' = 'shoot'
-  /** How many defenders the carrier has chosen to clear first. */
-  private pendingBreakPast = 0
   private encounterKind: Encounter['kind'] = 'contested'
-  private defenderCount = 0
+  /** Who was on the carrier at the last render, to notice a break landing. */
+  private lastDefenders = ''
 
   constructor(
     private readonly element: HTMLElement,
@@ -100,6 +93,20 @@ export class EncounterMenu {
     if (this.mode === 'defence' && !state.phase.encounter.awaitingDefence) {
       this.mode = 'actions'
       this.signature = ''
+    }
+
+    // A break landed: fewer defenders than a moment ago, and the encounter is
+    // still open. Start the decision again from the top rather than leaving the
+    // player staring at the break question they have just answered — with one
+    // fewer defender in the way, shooting may now be the thing to do.
+    const defenders = state.phase.encounter.defenders.map((d) => d.id).join(',')
+    if (defenders !== this.lastDefenders) {
+      this.lastDefenders = defenders
+      if (this.mode !== 'defence') {
+        this.mode = 'actions'
+        this.pendingTargetId = null
+        this.signature = ''
+      }
     }
 
     const signature = this.signatureFor(state)
@@ -135,7 +142,6 @@ export class EncounterMenu {
       encounter.kind,
       String(encounter.awaitingDefence),
       this.pendingTargetId ?? '',
-      this.pendingBreakPast,
       encounter.carrierId,
       ...encounter.defenders.map((d) => `${d.id}:${d.attack}`),
     ].join('|')
@@ -148,7 +154,7 @@ export class EncounterMenu {
     this.signature = ''
     this.rows = []
     this.pendingTargetId = null
-    this.pendingBreakPast = 0
+    this.lastDefenders = ''
     this.encounterKind = 'contested'
   }
 
@@ -159,7 +165,6 @@ export class EncounterMenu {
     if (!carrier) return
 
     this.encounterKind = encounter.kind
-    this.defenderCount = encounter.defenders.length
     this.rows = this.buildRows(state, carrier, encounter)
 
     const list = document.createElement('ul')
@@ -229,8 +234,8 @@ export class EncounterMenu {
         return this.defenceRows(state, encounter)
       case 'passTargets':
         return this.passTargetRows(state, carrier)
-      case 'breakPast':
-        return this.breakPastRows(state, carrier, encounter)
+      case 'breakthrough':
+        return this.breakthroughRows(state, encounter)
       case 'passTechnique':
         return this.techniqueRows(carrier, 'pass')
       case 'shootTechnique':
@@ -280,7 +285,8 @@ export class EncounterMenu {
         label: 'Breakthrough',
         detail: `EN ${encounter.endurance} − AT ${min === max ? min : `${min}–${max}`}`,
         tone: outcomeTone(best, worst) === 'good' ? 'safe' : worst > 0 ? 'neutral' : 'risky',
-        effect: { commit: { kind: 'breakthrough' } },
+        // How many to take on is its own question, as it is in FFX.
+        effect: { open: 'breakthrough' },
         enabled: true,
       })
     }
@@ -291,31 +297,21 @@ export class EncounterMenu {
         detail: 'Find a teammate in space',
         tone: 'neutral',
         effect: { open: 'passTargets' },
-        throwKind: 'pass',
         enabled: true,
       })
     }
 
     if (permitted.includes('shoot')) {
+      const hasTechniques = techniquesOf(carrier.def.techniques, 'shoot').length > 0
       rows.push({
         label: 'Shoot',
         detail: 'Take on the keeper',
         tone: 'neutral',
-        effect: {
-          open:
-            encounter.defenders.length > 0
-              ? 'breakPast'
-              : techniquesOf(carrier.def.techniques, 'shoot').length > 0
-                ? 'shootTechnique'
-                : 'actions',
-        },
-        // With nobody on the carrier and no techniques there is nothing left to
-        // ask, so the row commits rather than opening a step.
-        ...(encounter.defenders.length === 0 &&
-        techniquesOf(carrier.def.techniques, 'shoot').length === 0
-          ? { effect: { commit: { kind: 'shoot' as const, techniqueId: null, breakPast: 0 } } }
-          : {}),
-        throwKind: 'shoot',
+        // Straight at goal against whoever is still on them. Clearing a lane
+        // first is a breakthrough, made before choosing to shoot at all.
+        effect: hasTechniques
+          ? { open: 'shootTechnique' }
+          : { commit: { kind: 'shoot' as const, techniqueId: null } },
         enabled: true,
       })
     }
@@ -357,49 +353,56 @@ export class EncounterMenu {
   }
 
   /**
-   * Where choosing a receiver leads: the break-past step if anyone is on the
-   * carrier, then techniques if they have any, and otherwise straight to the ball.
+   * Where choosing a receiver leads: techniques if they have any, and otherwise
+   * straight to the ball.
    */
   private afterTargetChosen(carrier: Player): (targetId: string) => Row['effect'] {
-    if (this.defenderCount > 0) return () => ({ open: 'breakPast' })
     if (techniquesOf(carrier.def.techniques, 'pass').length > 0) {
       return () => ({ open: 'passTechnique' })
     }
-    return (targetId) => ({
-      commit: { kind: 'pass', targetId, techniqueId: null, breakPast: 0 },
-    })
+    return (targetId) => ({ commit: { kind: 'pass', targetId, techniqueId: null } })
   }
 
   /**
-   * How many defenders to get past before throwing.
+   * How many of them to take on.
    *
-   * Clearing someone costs endurance against their attack, and takes their
-   * blocking out of the throw that follows. The rows show both sides of that
-   * trade, so the decision is made on the numbers rather than on a hunch.
+   * Breaking is a step inside the encounter rather than something bundled onto a
+   * throw: beat all of them and the carrier swims on, beat some and they are
+   * still caught — by fewer, and it is only the survivors whose blocking counts
+   * against whatever they do next. The rows show both sides of that trade.
    */
-  private breakPastRows(state: MatchState, carrier: Player, encounter: Encounter): Row[] {
-    const stat = this.pendingThrow === 'pass' ? 'pa' : 'sh'
-    const power = carrier.stats[stat]
-    const label = stat.toUpperCase()
+  private breakthroughRows(state: MatchState, encounter: Encounter): Row[] {
+    const stayPut: Row = {
+      label: 'No Break',
+      detail: 'Think again',
+      tone: 'neutral',
+      effect: { open: 'actions' },
+      enabled: true,
+    }
 
-    // Counts from nobody up to all of them, so the full choice is on offer.
-    return Array.from({ length: encounter.defenders.length + 1 }, (_, count) => {
+    const breaks = Array.from({ length: encounter.defenders.length }, (_, index) => {
+      const count = index + 1
       const cost = tackleRange(encounter.defenders.slice(0, count))
       const facing = blockRange(encounter.defenders.slice(count))
-      const survives = power - facing.max > 0
+      const clearsEveryone = count === encounter.defenders.length
 
       return {
-        label: count === 0 ? 'No Break' : `Break to ${this.namesOf(state, encounter, count)}`,
-        detail:
-          `${label} ${power} vs BL ${facing.min}–${facing.max}` +
-          (count > 0 ? ` · costs EN ${cost.min}–${cost.max}` : ''),
-        tone: survives ? ('safe' as const) : ('risky' as const),
-        effect: this.afterBreakPastChosen(carrier, count),
-        breakPast: count,
-        enabled: count === 0 || cost.max < encounter.endurance,
+        label: `Break to ${this.namesOf(state, encounter, count)}`,
+        detail: clearsEveryone
+          ? `costs EN ${cost.min}–${cost.max} · free to swim on`
+          : `costs EN ${cost.min}–${cost.max} · still facing BL ${facing.min}–${facing.max}`,
+        tone: cost.max < encounter.endurance ? ('safe' as const) : ('risky' as const),
+        effect: { commit: { kind: 'breakthrough' as const, breakPast: count } },
+        // Worth attempting even when it might not come off; refusing anything
+        // risky would mean a low-endurance carrier could never break at all.
+        enabled: cost.min < encounter.endurance,
       }
     })
+
+    return [stayPut, ...breaks]
   }
+
+
 
   /**
    * The defenders a break of this depth goes through, named.
@@ -418,32 +421,17 @@ export class EncounterMenu {
     return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
   }
 
-  /**
-   * Where choosing how many to clear leads: the technique step if the carrier
-   * has any for this throw, and otherwise straight to making it.
-   */
-  private afterBreakPastChosen(carrier: Player, count: number): Row['effect'] {
-    const kind = this.pendingThrow
-    if (techniquesOf(carrier.def.techniques, kind).length > 0) {
-      return { open: kind === 'pass' ? 'passTechnique' : 'shootTechnique' }
-    }
-    return { commit: this.throwAction(kind, null, count) }
-  }
+
 
   /** Assemble a throw from everything gathered across the steps. */
-  private throwAction(
-    kind: 'pass' | 'shoot',
-    technique: Technique | null,
-    breakPast = this.pendingBreakPast,
-  ): EncounterAction {
+  private throwAction(kind: 'pass' | 'shoot', technique: Technique | null): EncounterAction {
     if (kind === 'shoot') {
-      return { kind: 'shoot', techniqueId: technique?.id ?? null, breakPast }
+      return { kind: 'shoot', techniqueId: technique?.id ?? null }
     }
     return {
       kind: 'pass',
       targetId: this.pendingTargetId ?? '',
       techniqueId: technique?.id ?? null,
-      breakPast,
     }
   }
 
@@ -548,14 +536,9 @@ export class EncounterMenu {
   private previousStep(): Mode {
     switch (this.mode) {
       case 'passTechnique':
+        return 'passTargets'
       case 'shootTechnique':
-        return this.defenderCount > 0
-          ? 'breakPast'
-          : this.pendingThrow === 'pass'
-            ? 'passTargets'
-            : 'actions'
-      case 'breakPast':
-        return this.pendingThrow === 'pass' ? 'passTargets' : 'actions'
+      case 'breakthrough':
       default:
         return 'actions'
     }
@@ -569,9 +552,7 @@ export class EncounterMenu {
     // Recorded on selection rather than while building the rows: doing it during
     // the build left the pending throw set to whichever row happened to be
     // constructed last.
-    if (row.throwKind) this.pendingThrow = row.throwKind
     if (row.targetId) this.pendingTargetId = row.targetId
-    if (row.breakPast !== undefined) this.pendingBreakPast = row.breakPast
 
     if ('defend' in row.effect) {
       this.handlers.onDefend(row.effect.defend)
