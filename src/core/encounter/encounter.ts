@@ -5,6 +5,7 @@ import { distanceBetween, opponentOf, playerById } from '../match/queries'
 import { giveBallTo } from '../match/possession'
 import { startPass, startShot } from '../match/flight'
 import type {
+  DefenceChoice,
   Encounter,
   EncounterAction,
   EncounterDefender,
@@ -100,6 +101,9 @@ export function openEncounter(
     kind: 'contested',
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+    // Being run at is a decision too: the carrier waits on the defence.
+    awaitingDefence: defenders.some((d) => d.team === USER_TEAM),
+    defence: null,
   }
 }
 
@@ -116,6 +120,8 @@ export function openOnTheBall(state: MatchState, carrier: Player): Encounter {
     defenders: [],
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+    awaitingDefence: false,
+    defence: null,
   }
 }
 
@@ -178,6 +184,8 @@ export function openDistribution(state: MatchState, keeper: Player): Encounter {
     defenders: [],
     endurance: state.endurance,
     thinkTimer: keeper.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+    awaitingDefence: false,
+    defence: null,
   }
 }
 
@@ -297,9 +305,10 @@ function concedePossession(
   state: MatchState,
   tackler: Player,
   carrier: Player,
+  defence: DefenceChoice | null = null,
 ): string {
   awardExp(state, tackler, 'tackle')
-  const technique = useTackleTechnique(tackler, carrier)
+  const technique = useTackleTechnique(tackler, carrier, defence)
   giveBallTo(state, tackler)
   return `tackled by ${tackler.def.name}${technique ? ` · ${technique.name}!` : ''}`
 }
@@ -327,7 +336,7 @@ function resolveBreakthrough(
   return {
     action: 'breakthrough',
     success: false,
-    summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier)}`,
+    summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
   }
 }
 
@@ -373,19 +382,55 @@ function pushPastCarrier(state: MatchState, defenders: Player[], carrier: Player
 }
 
 /**
- * Fire a defender's tackle technique on the player they just dispossessed.
+ * Fire a tackle technique on the player who was just dispossessed.
  *
- * Tackle techniques belong to the defence and have no menu, so they trigger
- * automatically when the tackle lands and the defender can pay for it.
+ * `chosen` is what the defence committed to, if a person was asked. Honoured
+ * only if the defender who actually won the ball knows it and can pay — the
+ * choice is made before the rolls, so it may land on someone else entirely, and
+ * a plain tackle is the honest outcome rather than quietly substituting another
+ * technique nobody picked.
+ *
+ * With nothing chosen, as when the AI defends, the first affordable technique
+ * fires automatically.
  */
-function useTackleTechnique(tackler: Player, victim: Player): Technique | null {
-  for (const technique of techniquesOf(tackler.def.techniques, 'tackle')) {
+export function useTackleTechnique(
+  tackler: Player,
+  victim: Player,
+  defence: DefenceChoice | null = null,
+): Technique | null {
+  const known = techniquesOf(tackler.def.techniques, 'tackle')
+  // Nobody chose: the defender brings whatever they have. Somebody chose: only
+  // that, and choosing nothing means nothing.
+  const candidates = defence
+    ? known.filter((t) => t.id === defence.techniqueId)
+    : known
+
+  for (const technique of candidates) {
     if (!canAfford(tackler, technique.hpCost)) continue
     spendHp(tackler, technique.hpCost)
     if (technique.inflicts) applyStatus(victim, technique.inflicts)
     return technique
   }
   return null
+}
+
+/** Tackle techniques the user's engaged defenders could bring to bear. */
+export function defensiveTechniques(state: MatchState, encounter: Encounter): Technique[] {
+  const seen = new Set<string>()
+  const available: Technique[] = []
+
+  for (const engaged of encounter.defenders) {
+    const defender = playerById(state, engaged.id)
+    if (!defender || defender.team !== USER_TEAM) continue
+
+    for (const technique of techniquesOf(defender.def.techniques, 'tackle')) {
+      if (seen.has(technique.id) || !canAfford(defender, technique.hpCost)) continue
+      seen.add(technique.id)
+      available.push(technique)
+    }
+  }
+
+  return available
 }
 
 /**
@@ -537,7 +582,7 @@ function clearTheWay(
   if (challenge.tackler) {
     return {
       lost: true,
-      summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier)}`,
+      summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
       remaining: [],
     }
   }

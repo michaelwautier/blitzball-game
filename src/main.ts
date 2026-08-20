@@ -4,6 +4,7 @@ import {
   createMatch,
   requestActionMenu,
   stepMatch,
+  submitDefence,
   submitEncounterAction,
   switchControlled,
   type MatchState,
@@ -47,6 +48,7 @@ function newMatch(): MatchState {
 
 const menu = new EncounterMenu(element('#encounter'), {
   onAction: (action) => submitEncounterAction(state, action),
+  onDefend: (techniqueId) => submitDefence(state, techniqueId),
   onCancel: () => cancelActionMenu(state),
 })
 
@@ -115,6 +117,7 @@ if (import.meta.env.DEV) {
       summary,
       stepMatch,
       submitEncounterAction,
+      submitDefence,
       requestActionMenu,
       cancelActionMenu,
       switchControlled,

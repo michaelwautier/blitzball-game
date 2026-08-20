@@ -273,6 +273,8 @@ describe('encounter input', () => {
         defenders: [{ id: 'home:letty', attack: 9, block: 5 }],
         endurance: 10,
         thinkTimer: 5,
+        awaitingDefence: false,
+        defence: null,
       },
     }
     expect(submitEncounterAction(state, { kind: 'shoot', techniqueId: null, breakPast: 0 })).toBe(false)
@@ -290,6 +292,8 @@ describe('encounter input', () => {
         defenders: [{ id: 'away:doram', attack: 9, block: 5 }],
         endurance: 100,
         thinkTimer: 0,
+        awaitingDefence: false,
+        defence: null,
       },
     }
     expect(submitEncounterAction(state, { kind: 'breakthrough' })).toBe(true)

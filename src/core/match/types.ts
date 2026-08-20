@@ -134,6 +134,28 @@ export interface Encounter {
   endurance: number
   /** Delay before an AI carrier commits, so its choice is readable. */
   thinkTimer: number
+  /**
+   * True while the user's defenders have yet to say how they are challenging.
+   *
+   * FFX presents an encounter to both sides — "flip stats if you are playing
+   * defensively" — so being run at is a decision too, not something that simply
+   * happens to you. The carrier does not commit until the defence has answered.
+   */
+  awaitingDefence: boolean
+  /**
+   * What the defence committed to, or null if nobody was asked.
+   *
+   * The distinction matters: "nobody chose" means the AI picks its own
+   * technique, whereas a choice of no technique is a plain tackle somebody
+   * deliberately went for. Collapsing both into a null id made choosing a plain
+   * tackle fire one anyway.
+   */
+  defence: DefenceChoice | null
+}
+
+export interface DefenceChoice {
+  /** Null is a plain tackle, deliberately chosen. */
+  techniqueId: string | null
 }
 
 /** A pass or shot travelling, still liable to be contested. */

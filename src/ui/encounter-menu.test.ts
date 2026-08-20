@@ -18,6 +18,7 @@ import { BESAID_AUROCHS, LUCA_GOERS } from '../data/teams'
 let element: HTMLElement
 let menu: EncounterMenu
 let onAction: ReturnType<typeof vi.fn>
+let onDefend: ReturnType<typeof vi.fn>
 let onCancel: ReturnType<typeof vi.fn>
 /** The state the menu is currently showing, so `press` can repaint like the app does. */
 let current: MatchState
@@ -27,9 +28,11 @@ beforeEach(() => {
   element.hidden = true
   document.body.append(element)
   onAction = vi.fn()
+  onDefend = vi.fn()
   onCancel = vi.fn()
   menu = new EncounterMenu(element, {
     onAction: onAction as (a: EncounterAction) => void,
+    onDefend: onDefend as (id: string | null) => void,
     onCancel: onCancel as () => void,
   })
 })
@@ -62,7 +65,15 @@ function openMenu(
 
   state.phase = {
     kind: 'encounter',
-    encounter: { kind, carrierId, defenders, endurance, thinkTimer: 0 },
+    encounter: {
+      kind,
+      carrierId,
+      defenders,
+      endurance,
+      thinkTimer: 0,
+      awaitingDefence: false,
+      defence: null,
+    },
   }
   current = state
   menu.update(state)
