@@ -34,7 +34,7 @@ export const ROLL_MAX = 1.5
 export const PASS_DECAY_PER_UNIT = 0.06 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /** Power a shot loses per world unit travelled. Steeper, so range matters more. */
-export const SHOT_DECAY_PER_UNIT = 0.3 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
+export const SHOT_DECAY_PER_UNIT = 0.5 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /**
  * Roll a contested stat: between half and one and a half times its value.

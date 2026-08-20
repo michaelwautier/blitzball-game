@@ -40,6 +40,16 @@ const MAX_SHOOTING_RANGE = POOL_RADIUS * 0.68
  */
 const POINT_BLANK_RANGE = POOL_RADIUS * 0.16
 
+/**
+ * The closest an attacker will carry the ball before shooting.
+ *
+ * Without it an AI carrier swims into the goal and stops there: the AI only ever
+ * chooses an action inside an encounter, so an unopposed attacker had no
+ * mechanism to shoot at all and simply drove at the net until someone tackled
+ * them. This is both where they stop advancing and where they let fly.
+ */
+export const SHOOTING_STANDOFF = POOL_RADIUS * 0.22
+
 /** A cornered carrier will only chance a speculative shot from inside this range. */
 const DESPERATION_RANGE = POOL_RADIUS * 0.4
 
@@ -252,4 +262,23 @@ export function chooseDistribution(state: MatchState, keeper: Player): Encounter
     targetId: receiver?.id ?? '',
     techniqueId: receiver ? chooseTechnique(keeper, 'pass') : null,
   }
+}
+
+/**
+ * Whether an AI carrier should stop and shoot of its own accord.
+ *
+ * Deliberately not the same question as `isShotWorthTaking`, which judges a shot
+ * the carrier has already been forced into. This is about a carrier in the clear
+ * choosing to pull the trigger rather than keep swimming, and the answer is
+ * simply "once you are close enough" — otherwise attackers either shoot from
+ * range at every opportunity or carry the ball into the net.
+ */
+export function shouldStopAndShoot(state: MatchState, carrier: Player): boolean {
+  const goalDistance = distanceToOpposingGoal(state, carrier)
+  if (goalDistance > SHOOTING_STANDOFF) return false
+  // Almost on the goal line there is nothing else to do but shoot.
+  if (goalDistance <= SHOOTING_STANDOFF * 0.45) return true
+  // Otherwise only pull the trigger on a chance actually worth taking, rather
+  // than letting fly the instant the goal comes into range.
+  return isShotWorthTaking(state, carrier, goalDistance)
 }

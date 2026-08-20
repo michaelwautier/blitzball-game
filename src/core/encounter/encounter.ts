@@ -34,7 +34,7 @@ import { awardExp } from '../match/exp'
  * the defence being spread to nothing.
  */
 export const ENGAGE_RADIUS =
-  PLAYER_RADIUS * 2.3 * Math.sqrt(POOL_RADIUS / REFERENCE_POOL_RADIUS)
+  PLAYER_RADIUS * 2.3 * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
 
 /** Seconds an AI carrier appears to deliberate, so its choice is readable. */
 export const AI_THINK_SECONDS = 0.35

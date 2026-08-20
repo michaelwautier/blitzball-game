@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { desiredPosition, isChasing } from './positioning'
+import { CHASERS, desiredPosition, isChasing } from './positioning'
 import { createMatch, stepMatch } from '../match/state'
 import type { MatchState, Player } from '../match/types'
 import { PLAYER_RADIUS } from '../match/movement'
@@ -59,7 +59,7 @@ describe('off-ball positioning', () => {
     expect(high).toBeLessThan(low)
   })
 
-  it('sends only two outfielders after a loose ball', () => {
+  it('sends only a few outfielders after a loose ball, not the side', () => {
     const state = newMatch('chase')
     state.ball.carrier = null
     state.ball.x = 0
@@ -67,7 +67,9 @@ describe('off-ball positioning', () => {
 
     for (const team of ['home', 'away'] as const) {
       const chasing = state.players.filter((p) => p.team === team && isChasing(state, p))
-      expect(chasing).toHaveLength(2)
+      expect(chasing).toHaveLength(CHASERS)
+      // Short of the whole outfield, or there would be no shape left.
+      expect(chasing.length).toBeLessThan(5)
     }
   })
 
@@ -85,7 +87,7 @@ describe('off-ball positioning', () => {
     state.ball.carrier = bickson.id
 
     const defenders = state.players.filter((p) => p.team === 'home' && isChasing(state, p))
-    expect(defenders).toHaveLength(2)
+    expect(defenders).toHaveLength(CHASERS)
 
     const teammates = state.players.filter((p) => p.team === 'away' && isChasing(state, p))
     expect(teammates).toHaveLength(0)
@@ -103,7 +105,7 @@ describe('off-ball positioning', () => {
     expect(desiredPosition(state, marker).x).toBeLessThan(bickson.x)
   })
 
-  it('gives the two closing defenders different spots to aim for', () => {
+  it('gives the closing defenders different spots to aim for', () => {
     const state = newMatch('fan-out')
     const bickson = find(state, 'away:bickson')
     bickson.x = 0
@@ -111,7 +113,7 @@ describe('off-ball positioning', () => {
     state.ball.carrier = bickson.id
 
     const markers = state.players.filter((p) => p.team === 'home' && isChasing(state, p))
-    expect(markers).toHaveLength(2)
+    expect(markers).toHaveLength(CHASERS)
 
     const [first, second] = markers.map((p) => desiredPosition(state, p))
     expect(Math.hypot(first!.x - second!.x, first!.y - second!.y)).toBeGreaterThan(PLAYER_RADIUS)

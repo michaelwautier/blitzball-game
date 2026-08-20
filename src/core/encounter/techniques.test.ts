@@ -6,6 +6,7 @@ import { giveBallTo } from '../match/possession'
 import { hasStatus } from '../match/status'
 import type { MatchState, Player } from '../match/types'
 import { TECHNIQUES, findTechnique, techniquesOf } from '../../data/techniques'
+import { GOAL_X } from '../pitch'
 import { BESAID_AUROCHS, LUCA_GOERS, TEAMS } from '../../data/teams'
 
 const TICK = 1 / 60
@@ -153,7 +154,15 @@ describe('technique effects', () => {
   it('poisons the keeper with a Venom Shot, saved or not', () => {
     const state = newMatch('venom')
     const carrier = setUpEncounter(state, 'home:wakka', 1)
-    carrier.x = 30
+    // Close enough that the shot still has power when it arrives: a shot that
+    // runs out on the way never reaches the keeper to poison them.
+    carrier.x = GOAL_X - 12
+    // The ball rides with its carrier during play, but this resolves an
+    // encounter directly, so it has to be brought along by hand — otherwise the
+    // shot sets off from the centre spot and expires before reaching the goal.
+    state.ball.x = carrier.x
+    state.ball.y = carrier.y
+
     const keeper = find(state, 'away:raudy')
     expect(hasStatus(keeper, 'poison')).toBe(false)
 

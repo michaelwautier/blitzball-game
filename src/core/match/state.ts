@@ -4,7 +4,7 @@ import { BALL_RADIUS, POOL_RADIUS, clampToPool } from '../pitch'
 import { POSITION_KEYS, type TeamDef } from '../../data/types'
 import { findPlayer } from '../../data/teams'
 import { desiredPosition } from '../ai/positioning'
-import { chooseEncounterAction } from '../ai/decisions'
+import { chooseEncounterAction, shouldStopAndShoot } from '../ai/decisions'
 import {
   engagingDefenders,
   openDistribution,
@@ -236,7 +236,30 @@ function stepPlay(state: MatchState, dt: number, input: MatchInput): void {
   movePlayers(state, dt, input)
   updateBall(state, dt)
   maybeOpenEncounter(state)
+  maybeShootOnSight(state)
   updateControlled(state)
+}
+
+/**
+ * An AI carrier close enough to goal stops and takes the shot on.
+ *
+ * The AI only ever chooses an action inside an encounter, so an attacker nobody
+ * challenged had no way to shoot and simply swam into the net. Opening the same
+ * on-the-ball decision the user gets with the space bar gives them the moment to
+ * pull the trigger.
+ *
+ * Never done for the user's own carrier: deciding when to shoot is the whole
+ * point of being on the ball, and having the menu appear uninvited would take
+ * that away.
+ */
+function maybeShootOnSight(state: MatchState): void {
+  if (state.phase.kind !== 'play') return
+
+  const carrier = carrierOf(state)
+  if (!carrier || carrier.team === USER_TEAM || carrier.slot === 'GK') return
+  if (!shouldStopAndShoot(state, carrier)) return
+
+  state.phase = { kind: 'encounter', encounter: openOnTheBall(state, carrier) }
 }
 
 /**
