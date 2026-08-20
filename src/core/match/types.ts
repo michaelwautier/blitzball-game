@@ -1,6 +1,8 @@
 import type { Rng } from '../rng'
 import type { Side, Vec2 } from '../pitch'
 import type { PlayerDef, PositionKey, TeamDef } from '../../data/types'
+import type { Technique } from '../../data/techniques'
+import type { StatusEffect } from './status'
 import type { Movable } from './movement'
 
 export type TeamId = 'home' | 'away'
@@ -14,7 +16,10 @@ export interface Player extends Movable {
   def: PlayerDef
   team: TeamId
   slot: PositionKey
+  /** Doubles as stamina: actions and techniques spend it, poison drains it. */
   hp: number
+  /** Conditions currently affecting this player. */
+  statuses: StatusEffect[]
 }
 
 export interface Ball extends Movable {
@@ -30,11 +35,17 @@ export interface TeamState {
   score: number
 }
 
-/** What a carrier can do when defenders close in. */
+/**
+ * What a carrier can do when defenders close in.
+ *
+ * `techniqueId` is null for the plain version of an action. Dribbling has no
+ * techniques, following FFX — which is why breaking through is always the
+ * option that costs nothing but endurance.
+ */
 export type EncounterAction =
   | { kind: 'breakthrough' }
-  | { kind: 'pass'; targetId: string }
-  | { kind: 'shoot' }
+  | { kind: 'pass'; targetId: string; techniqueId: string | null }
+  | { kind: 'shoot'; techniqueId: string | null }
 
 export interface EncounterDefender {
   id: string
@@ -73,6 +84,10 @@ export interface BallFlight {
   power: number
   /** Defenders who have already taken their bite, so nobody contests twice. */
   contested: string[]
+  /** Technique used to launch it, whose effects apply on contact and arrival. */
+  technique: Technique | null
+  /** Contests still to be waved through, from the technique's `ignoresBlockers`. */
+  blockersIgnored: number
 }
 
 export type MatchPhase =

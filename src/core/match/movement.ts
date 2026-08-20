@@ -1,5 +1,4 @@
 import { clampToPool, type Vec2 } from '../pitch'
-import type { PlayerStats } from '../../data/types'
 
 export const PLAYER_RADIUS = 2.2
 
@@ -18,8 +17,8 @@ export interface Movable extends Vec2 {
 }
 
 /** Top swim speed in world units per second, derived from SP. */
-export function maxSpeed(stats: PlayerStats): number {
-  return 7 + stats.sp * 0.5
+export function maxSpeed(sp: number): number {
+  return 7 + sp * 0.5
 }
 
 /** Carrying the ball costs a little pace. */

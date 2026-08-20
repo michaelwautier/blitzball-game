@@ -28,6 +28,23 @@ export interface PlayerStats {
   ca: number
 }
 
+/** Conditions a technique can inflict. */
+export type StatusKind = 'poison' | 'sleep' | 'wither'
+
+/** What a technique inflicts, before it is attached to a player as a live effect. */
+export interface StatusSpec {
+  kind: StatusKind
+  /** Seconds the condition lasts. */
+  duration: number
+  /**
+   * Poison: HP drained per second. Sleep: unused. Wither: the fraction of the
+   * affected stat that is lost, so 0.4 leaves the player at 60%.
+   */
+  magnitude: number
+  /** Wither only: which stat is sapped. */
+  stat?: keyof PlayerStats
+}
+
 export interface PlayerDef {
   id: string
   name: string
@@ -35,6 +52,8 @@ export interface PlayerDef {
   natural: PositionKey
   /** Base stats at level 1. */
   stats: PlayerStats
+  /** Ids of the techniques this player has learned. */
+  techniques: readonly string[]
 }
 
 export interface TeamDef {

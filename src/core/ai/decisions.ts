@@ -1,5 +1,6 @@
 import { GOAL_HALF_HEIGHT, goalLineX } from '../pitch'
-import { CONTEST_RADIUS, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
+import { ACTION_HP_COST, CONTEST_RADIUS, SHOT_DECAY_PER_UNIT } from '../encounter/formulas'
+import { techniquesOf } from '../../data/techniques'
 import {
   distanceBetween,
   keeperFor,
@@ -54,19 +55,25 @@ export function chooseEncounterAction(
   const incoming = encounter.defenders.reduce((total, d) => total + d.attack, 0)
   const canBreakThrough = encounter.endurance - incoming > BREAKTHROUGH_MARGIN
 
-  if (isShotWorthTaking(state, carrier, goalDistance)) return { kind: 'shoot' }
+  if (isShotWorthTaking(state, carrier, goalDistance)) {
+    return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
+  }
 
   if (canBreakThrough) return { kind: 'breakthrough' }
 
   const receiver = bestPassTarget(state, carrier)
-  if (receiver) return { kind: 'pass', targetId: receiver.id }
+  if (receiver) {
+    return { kind: 'pass', targetId: receiver.id, techniqueId: chooseTechnique(carrier, 'pass') }
+  }
 
   // Cornered: no shot on, not enough endurance, nobody to find. A speculative
   // shot at least tests the keeper, where barging into a tackle we have already
   // calculated we lose just hands the ball over. Without this fallback a team
   // whose best shooter cannot clear the opposing keeper's catching never shoots
   // at all, at any range, for the entire match.
-  if (goalDistance <= DESPERATION_RANGE) return { kind: 'shoot' }
+  if (goalDistance <= DESPERATION_RANGE) {
+    return { kind: 'shoot', techniqueId: chooseTechnique(carrier, 'shoot') }
+  }
 
   return { kind: 'breakthrough' }
 }
@@ -152,4 +159,37 @@ export function hasShootingAngle(state: MatchState, player: Player): boolean {
   // Behind the goal line or wildly wide of the posts is not a shot.
   const wide = Math.abs(player.y) > GOAL_HALF_HEIGHT * 3
   return Math.abs(goalX - player.x) > 1 && !wide
+}
+
+/**
+ * Fraction of a player's maximum HP kept back rather than spent on techniques.
+ *
+ * Proportional rather than flat so it means the same thing to Datto on 160 HP as
+ * to Wakka on 250. Without a meaningful reserve the AI leans on its best move
+ * every time it acts and spends the closing stages exhausted.
+ */
+const TECHNIQUE_HP_RESERVE_FRACTION = 0.45
+
+/**
+ * The best technique this player can afford for an action, or null for the plain
+ * version. Scored on power, with a premium on inflicting a condition or going
+ * straight through blockers, since both are worth more than raw numbers.
+ */
+export function chooseTechnique(player: Player, kind: 'shoot' | 'pass'): string | null {
+  let best: string | null = null
+  let bestScore = 0
+
+  for (const technique of techniquesOf(player.def.techniques, kind)) {
+    const total = ACTION_HP_COST[kind] + technique.hpCost
+    const reserve = player.def.stats.hp * TECHNIQUE_HP_RESERVE_FRACTION
+    if (player.hp - total < reserve) continue
+
+    const score = technique.power + (technique.inflicts ? 5 : 0) + technique.ignoresBlockers * 3
+    if (score > bestScore) {
+      bestScore = score
+      best = technique.id
+    }
+  }
+
+  return best
 }

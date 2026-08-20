@@ -59,8 +59,22 @@
         backdrop-filter: blur(8px);
       }
       .enc-heading {
+        display: flex;
+        gap: 12px;
         font-size: 14px;
         opacity: 0.75;
+      }
+      .enc-hp {
+        margin-left: auto;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .enc-option:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+      }
+      .enc-option:disabled:hover {
+        background: rgb(255 255 255 / 0.05);
+        border-color: transparent;
       }
       .enc-odds {
         display: flex;

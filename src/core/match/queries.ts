@@ -1,5 +1,6 @@
 import { attackDirection } from './formation'
 import { CARRY_SPEED_FACTOR, maxSpeed } from './movement'
+import { effectiveStat } from './stats'
 import type { MatchState, Player, TeamId } from './types'
 
 export function playerById(state: MatchState, id: string): Player | undefined {
@@ -13,7 +14,7 @@ export function carrierOf(state: MatchState): Player | undefined {
 
 /** Top speed for this player right now, accounting for carrying the ball. */
 export function speedOf(player: Player, state: MatchState): number {
-  const base = maxSpeed(player.def.stats)
+  const base = maxSpeed(effectiveStat(player, 'sp'))
   return state.ball.carrier === player.id ? base * CARRY_SPEED_FACTOR : base
 }
 

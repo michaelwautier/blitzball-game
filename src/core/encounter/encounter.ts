@@ -10,7 +10,10 @@ import type {
   Player,
 } from '../match/types'
 import { USER_TEAM } from '../match/types'
-import { rollStat } from './formulas'
+import { ACTION_HP_COST, rollStat } from './formulas'
+import { findTechnique, techniquesOf, type Technique } from '../../data/techniques'
+import { applyStatus } from '../match/status'
+import { canAfford, effectiveStat, spendHp } from '../match/stats'
 
 /**
  * How close a defender must be to drag the carrier into an encounter.
@@ -65,7 +68,10 @@ export function openEncounter(
 ): Encounter {
   return {
     carrierId: carrier.id,
-    defenders: defenders.map((d) => ({ id: d.id, attack: rollStat(d.def.stats.at, state.rng) })),
+    defenders: defenders.map((d) => ({
+      id: d.id,
+      attack: rollStat(effectiveStat(d, 'at'), state.rng),
+    })),
     endurance: state.endurance,
     thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
   }
@@ -92,9 +98,9 @@ export function resolveEncounter(
     case 'breakthrough':
       return resolveBreakthrough(state, encounter, carrier)
     case 'pass':
-      return resolvePass(state, carrier, action.targetId)
+      return resolvePass(state, carrier, action.targetId, action.techniqueId)
     case 'shoot':
-      return resolveShoot(state, carrier)
+      return resolveShoot(state, carrier, action.techniqueId)
   }
 }
 
@@ -110,6 +116,8 @@ function resolveBreakthrough(
   encounter: Encounter,
   carrier: Player,
 ): EncounterResult {
+  spendHp(carrier, ACTION_HP_COST.breakthrough)
+
   const attack = encounter.defenders.reduce((total, d) => total + d.attack, 0)
   const remaining = encounter.endurance - attack
   state.endurance = Math.max(0, remaining)
@@ -126,27 +134,54 @@ function resolveBreakthrough(
   // Out of endurance: the strongest tackler takes it off them.
   const strongest = encounter.defenders.reduce((best, d) => (d.attack > best.attack ? d : best))
   const tackler = playerById(state, strongest.id)
-  if (tackler) giveBallTo(state, tackler)
-  else releaseBall(state)
+
+  let techniqueNote = ''
+  if (tackler) {
+    const technique = useTackleTechnique(tackler, carrier)
+    if (technique) techniqueNote = ` · ${technique.name}!`
+    giveBallTo(state, tackler)
+  } else {
+    releaseBall(state)
+  }
 
   return {
     action: 'breakthrough',
     success: false,
-    summary: `EN ${encounter.endurance} − AT ${attack} = ${remaining} · tackled by ${tackler?.def.name ?? 'the defence'}`,
+    summary: `EN ${encounter.endurance} − AT ${attack} = ${remaining} · tackled by ${tackler?.def.name ?? 'the defence'}${techniqueNote}`,
   }
+}
+
+/**
+ * Fire a defender's tackle technique on the player they just dispossessed.
+ *
+ * Tackle techniques belong to the defence and have no menu, so they trigger
+ * automatically when the tackle lands and the defender can pay for it.
+ */
+function useTackleTechnique(tackler: Player, victim: Player): Technique | null {
+  for (const technique of techniquesOf(tackler.def.techniques, 'tackle')) {
+    if (!canAfford(tackler, technique.hpCost)) continue
+    spendHp(tackler, technique.hpCost)
+    if (technique.inflicts) applyStatus(victim, technique.inflicts)
+    return technique
+  }
+  return null
 }
 
 function resolvePass(
   state: MatchState,
   carrier: Player,
   targetId: string,
+  techniqueId: string | null,
 ): EncounterResult {
   const receiver = playerById(state, targetId)
   if (!receiver || receiver.team !== carrier.team) {
     return { action: 'pass', success: false, summary: 'No one to pass to' }
   }
 
-  const flight = startPass(state, carrier, receiver)
+  const technique = affordableTechnique(carrier, techniqueId, 'pass')
+  spendHp(carrier, ACTION_HP_COST.pass + (technique?.hpCost ?? 0))
+
+  const flight = startPass(state, carrier, receiver, technique)
   state.ball.carrier = null
   state.phase = { kind: 'flight', flight }
   state.engageCooldown = RESUME_GRACE
@@ -154,12 +189,19 @@ function resolvePass(
   return {
     action: 'pass',
     success: true,
-    summary: `PA ${flight.power.toFixed(0)} · ${carrier.def.name} → ${receiver.def.name}`,
+    summary: `${technique ? `${technique.name} · ` : ''}PA ${flight.power.toFixed(0)} · ${carrier.def.name} → ${receiver.def.name}`,
   }
 }
 
-function resolveShoot(state: MatchState, carrier: Player): EncounterResult {
-  const flight = startShot(state, carrier)
+function resolveShoot(
+  state: MatchState,
+  carrier: Player,
+  techniqueId: string | null,
+): EncounterResult {
+  const technique = affordableTechnique(carrier, techniqueId, 'shoot')
+  spendHp(carrier, ACTION_HP_COST.shoot + (technique?.hpCost ?? 0))
+
+  const flight = startShot(state, carrier, technique)
   state.ball.carrier = null
   state.phase = { kind: 'flight', flight }
   state.engageCooldown = RESUME_GRACE
@@ -167,6 +209,28 @@ function resolveShoot(state: MatchState, carrier: Player): EncounterResult {
   return {
     action: 'shoot',
     success: true,
-    summary: `SH ${flight.power.toFixed(0)} · ${carrier.def.name} shoots!`,
+    summary: `${technique ? `${technique.name}! · ` : ''}SH ${flight.power.toFixed(0)} · ${carrier.def.name} shoots!`,
   }
+}
+
+/**
+ * Resolve a requested technique, or fall back to the plain action.
+ *
+ * A player who cannot pay simply performs the ordinary version rather than the
+ * action failing, so running low on HP degrades what you can do instead of
+ * taking options away mid-decision.
+ */
+function affordableTechnique(
+  player: Player,
+  techniqueId: string | null,
+  kind: 'pass' | 'shoot',
+): Technique | null {
+  if (!techniqueId) return null
+  if (!player.def.techniques.includes(techniqueId)) return null
+
+  const technique = findTechnique(techniqueId)
+  if (technique.kind !== kind) return null
+  if (!canAfford(player, ACTION_HP_COST[kind] + technique.hpCost)) return null
+
+  return technique
 }

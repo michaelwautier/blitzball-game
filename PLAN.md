@@ -68,7 +68,7 @@ Vite + TS project, fixed-timestep game loop with interpolated rendering, Canvas 
 rendering (circular pool, halfway line, two goals), debug overlay, seedable RNG, and CI
 running typecheck/tests/build on every PR.
 
-### Phase 1 — Playable single match (the real PoC milestone)
+### Phase 1 — Playable single match ✅ (PRs #2, #3)
 - Data: Aurochs + Goers rosters with stats.
 - Free play: WASD/arrow control of ball carrier; auto-switch to nearest player on defense
   (or spectate — defense is largely automatic in FFX too); formation-based AI positioning;
@@ -81,10 +81,11 @@ running typecheck/tests/build on every PR.
   and SH high, pass to open man, breakthrough when EN dominates).
 - **Exit criteria: you can beat the Luca Goers in a fair, complete match in the browser.**
 
-### Phase 2 — Techniques & HP
-HP costs on all actions + slow regen; ~8 iconic techs (Jecht Shot, Venom Pass/Shot/Tackle,
-Nap Shot, Sphere Shot, Wither Pass, Brawler) with status effects (poison/sleep/dark) shown
-in the encounter menu with HP costs; tech slots per player; status icons over player heads.
+### Phase 2 — Techniques & HP ✅ (PR #4)
+HP as a spendable resource with slow regen; 8 techniques (Jecht Shot, Sphere Shot, Venom
+Shot, Nap Shot, Venom Pass, Wither Pass, Venom Tackle, Wither Tackle) with poison, sleep
+and wither, shown in the encounter menu with their HP price; per-player technique lists;
+stamina rings and condition markers on the pitch.
 
 ### Phase 3 — EXP & leveling
 EXP per contested action, level-up between matches with growth curves per player,

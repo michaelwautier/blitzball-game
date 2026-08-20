@@ -15,6 +15,8 @@ import {
   type Movable,
 } from './movement'
 import { collectLooseBall } from './possession'
+import { tickStatuses } from './status'
+import { HP_REGEN_PER_SECOND } from '../encounter/formulas'
 import { carrierOf, speedOf } from './queries'
 import {
   NO_INPUT,
@@ -99,6 +101,7 @@ function buildSide(team: TeamState): Player[] {
       vx: 0,
       vy: 0,
       hp: def.stats.hp,
+      statuses: [],
     }
   })
 }
@@ -161,6 +164,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
     case 'flight': {
       const { flight } = state.phase
       runClock(state, dt)
+      updateCondition(state, dt)
       movePlayers(state, dt, input)
       stepFlight(state, flight, dt)
       state.controlled = chooseControlled(state)
@@ -186,10 +190,26 @@ function stepPlay(state: MatchState, dt: number, input: MatchInput): void {
   runClock(state, dt)
   if (state.phase.kind !== 'play') return
 
+  updateCondition(state, dt)
   movePlayers(state, dt, input)
   updateBall(state, dt)
   maybeOpenEncounter(state)
   state.controlled = chooseControlled(state)
+}
+
+/**
+ * Advance conditions and recover stamina.
+ *
+ * Only the player on the ball is denied recovery: carrying is the work, and
+ * everyone else is catching their breath. Poison drains faster than the regen
+ * rate, so a poisoned player keeps losing ground until it wears off.
+ */
+function updateCondition(state: MatchState, dt: number): void {
+  for (const player of state.players) {
+    tickStatuses(player, dt)
+    if (state.ball.carrier === player.id) continue
+    player.hp = Math.min(player.def.stats.hp, player.hp + HP_REGEN_PER_SECOND * dt)
+  }
 }
 
 function runClock(state: MatchState, dt: number): void {

@@ -7,6 +7,8 @@ import {
   type Side,
 } from '../core/pitch'
 import { PLAYER_RADIUS } from '../core/match/movement'
+import { statusLabels } from '../core/match/status'
+import { isExhausted } from '../core/match/stats'
 import type { MatchState, Player } from '../core/match/state'
 
 /** Slack around the pool so the boundary glow is not clipped at the canvas edge. */
@@ -23,6 +25,10 @@ const COLOURS = {
   controlRing: '#ffffff',
   label: 'rgb(255 255 255 / 0.85)',
   danger: '#ff8b7a',
+  poison: '#c98bff',
+  sleep: '#9fe8ff',
+  wither: '#ffd479',
+  stamina: '#7ee38b',
 } as const
 
 /**
@@ -258,6 +264,45 @@ export class Renderer {
     ctx.font = '2.1px ui-sans-serif, system-ui, sans-serif'
     ctx.fillStyle = COLOURS.label
     ctx.fillText(player.def.name, x, y + PLAYER_RADIUS + 2.2)
+
+    this.drawStamina(player, x, y)
+    this.drawStatuses(player, x, y)
+  }
+
+  /**
+   * A stamina ring around a tiring player.
+   *
+   * Only drawn below full, so a fresh pitch stays clean and a drained player is
+   * immediately obvious — HP is a resource you have to be able to see to manage.
+   */
+  private drawStamina(player: Player, x: number, y: number): void {
+    const fraction = player.hp / player.def.stats.hp
+    if (fraction >= 1) return
+
+    const { ctx } = this
+    const start = -Math.PI / 2
+    ctx.beginPath()
+    ctx.arc(x, y, PLAYER_RADIUS + 0.9, start, start + Math.PI * 2 * Math.max(0, fraction))
+    ctx.strokeStyle = isExhausted(player) ? COLOURS.danger : COLOURS.stamina
+    ctx.lineWidth = 0.5
+    ctx.stroke()
+  }
+
+  /** Condition markers above a player's head. */
+  private drawStatuses(player: Player, x: number, y: number): void {
+    const labels = statusLabels(player)
+    if (labels.length === 0) return
+
+    const { ctx } = this
+    ctx.font = '600 1.9px ui-monospace, SFMono-Regular, Menlo, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+
+    labels.forEach((label, index) => {
+      ctx.fillStyle =
+        label === 'PSN' ? COLOURS.poison : label === 'ZZZ' ? COLOURS.sleep : COLOURS.wither
+      ctx.fillText(label, x, y - PLAYER_RADIUS - 2 - index * 2.2)
+    })
   }
 
   private drawBall(state: MatchState, alpha: number): void {
