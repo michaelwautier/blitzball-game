@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TEAMS, findPlayer } from './teams'
+import { TEAMS, findPlayer, findTeam } from './teams'
+import { findTechnique } from './techniques'
 import { POSITION_KEYS, type PlayerStats } from './types'
 
 const STAT_KEYS: readonly (keyof PlayerStats)[] = ['hp', 'sp', 'en', 'at', 'pa', 'bl', 'sh', 'ca']
@@ -45,7 +46,62 @@ describe('team data', () => {
     },
   )
 
+  it.each(TEAMS.map((team) => [team.name, team] as const))(
+    '%s only names techniques that exist',
+    (_name, team) => {
+      for (const player of team.roster) {
+        for (const id of player.techniques) {
+          expect(() => findTechnique(id), `${player.name} knows ${id}`).not.toThrow()
+        }
+      }
+    },
+  )
+
+  it.each(TEAMS.map((team) => [team.name, team] as const))(
+    '%s grows every stat it starts low on',
+    (_name, team) => {
+      for (const player of team.roster) {
+        for (const key of STAT_KEYS) {
+          expect(player.growth[key], `${player.name}.${key}`).toBeGreaterThanOrEqual(0)
+        }
+      }
+    },
+  )
+
   it('throws a useful error for an unknown player', () => {
     expect(() => findPlayer(TEAMS[0]!, 'nobody')).toThrow(/nobody/)
+  })
+})
+
+describe('the league of teams', () => {
+  it('fields six sides', () => {
+    expect(TEAMS).toHaveLength(6)
+  })
+
+  it('keeps ids, names and abbreviations unique, so results can be told apart', () => {
+    for (const key of ['id', 'name', 'abbreviation'] as const) {
+      const values = TEAMS.map((team) => team[key])
+      expect(new Set(values).size, `duplicate ${key}`).toBe(values.length)
+    }
+  })
+
+  it('gives every side a colour of its own to play in', () => {
+    const primaries = TEAMS.map((team) => team.colours.primary.toLowerCase())
+    expect(new Set(primaries).size).toBe(primaries.length)
+  })
+
+  it('numbers player ids per team, so two sides may both have a Datto', () => {
+    for (const team of TEAMS) {
+      expect(new Set(team.roster.map((p) => p.id)).size).toBe(team.roster.length)
+    }
+  })
+
+  it('looks a side up by id', () => {
+    expect(findTeam('fangs').name).toBe('Ronso Fangs')
+    expect(findTeam('psyches').lineup.GK).toBe('nimrook')
+  })
+
+  it('throws a useful error for an unknown side', () => {
+    expect(() => findTeam('zanarkand')).toThrow(/zanarkand/)
   })
 })
