@@ -58,7 +58,7 @@ stale — fix it.
   swimming without the ball; a player at 0 HP acts at half effectiveness.
 - **EXP/Levelling:** every contested action grants EXP; levels raise stats along per-player
   growth curves. Only the user's squad has careers — the AI sides stay at level one, so the
-  underdogs improve while the league stands still. See the open question in Phase 5.
+  underdogs improve while the league stands still. See the open question in Phase 6.
 - **League:** double round-robin among the 6 teams, 3 points for a win and 1 for a draw,
   standings table. The fixtures you are not in are played out by the same engine, headlessly.
 
@@ -127,11 +127,48 @@ Done:
 - **The league on screen, and saves** (#27): the game opens on a table, plays your fixture,
   resolves the round around it, and survives a reload.
 
-Not done — carried into Phase 5:
+Not done — carried into Phase 6:
 - Free-agent pool with salaries and contracts.
 - Prize money economy.
 
-### Phase 5 — Squads & recruiting (next, unordered)
+### Phase 5 — The FFX screen & flow (next, ordered)
+Planned from the user's FFX captures on 2026-08-21: the HUD moves to FFX's layout, and the
+encounter flow adopts FFX's breakthrough semantics. Five PRs, in this order — cosmetics that
+cannot break anything first, then gameplay changes one at a time so each can be measured
+against the ladder alone.
+
+1. **FFX HUD layout** (DOM/CSS only). Radar to the bottom-right with `TIME` and the score
+   stacked beneath it; the event line ("Kulukan on defense!", one per engaged defender) to the
+   bottom-left; the debug overlay above it; the encounter menu to the top-left, compacted into
+   an FFX-style titled box. Break options are named — "No Break / Break to Nuvy Ronso / Break
+   to Nuvy Ronso & Kiyuri" — from the encounter's nearest-first defender list. The emphatic
+   goal banner stays centred.
+2. **The conceding team takes the restart.** After a goal, `resetForKickoff` hands the ball to
+   `opponentOf(scorer)`'s MF at centre instead of racing a scattered loose ball — the scorer
+   winning that race half the time was a compounding unfairness. Each half still opens with
+   the neutral scatter, which is the blitzoff. Measured on the ladder; mismatches should
+   compress.
+3. **The FFX breakthrough flow.** Breaking past defenders becomes a *step inside* the
+   encounter rather than a bundle on the throw: `breakthrough` takes a depth (challenge the
+   nearest k), clearing everyone resumes play, clearing some keeps the encounter open against
+   the rest — who then block the throw. Pass and shoot lose their bundled break-past and go
+   straight to target/technique. There is no route back to open play while a defender is
+   still engaged (already true — cancel only works on a voluntary stop — and pinned by test).
+   The AI gets two-step play for free by re-deciding each think-tick. Ladder-measured: the HP
+   economy shifts (two action costs where the bundle paid one), and a cheap partial break must
+   not become dominant.
+4. **Top-right stat stack, and HP drains while carrying.** The FFX panel: the carrier's name
+   and effective `HP EN PA SH` always (either team's), plus one row per engaged defender
+   (`HP AT BL`, from the encounter's own snapshot — the numbers actually rolled) during
+   encounters. With it, carrying the ball drains HP (`CARRY_DRAIN_PER_SECOND`, starting
+   ~0.5/s) instead of merely denying regen, floored at zero so exhaustion stays the penalty.
+   Ladder-measured; technique affordability is the number to watch.
+5. **Encounter staging and camera.** Engaged defenders glide (via the existing lunge
+   mechanism) into a line between the attacker and their goal when the encounter opens, and
+   the camera dollies toward the tableau while the menu is up. Mostly presentation, but the
+   staged positions are live when play resumes, so it gets a ladder sample too.
+
+### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
 
 - **Squad and lineup control.** Today the lineup is fixed by a stat-profile guess in

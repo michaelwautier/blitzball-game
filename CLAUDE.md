@@ -24,3 +24,9 @@ coverage weights each swing the whole board.
 `core/` must not import from `render/` or `ui/`. That separation is what made the 3D swap a
 renderer change with no effect on gameplay, and what lets the league simulate its own fixtures
 with the identical engine.
+
+## One dev server, ever
+
+Before starting `npm run dev`, check for one already running (`pgrep -fl vite`) and reuse it —
+or kill it and start fresh. Never leave more than one. Background-started servers outlive the
+conversation that started them; four were once found quietly accumulated across sessions.
