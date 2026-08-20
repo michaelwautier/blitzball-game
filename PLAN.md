@@ -188,7 +188,8 @@ against the ladder alone.
    `BREAKTHROUGH_RECOVERY`, so the global blackout is half-redundant — and to give defending a
    challenge key that mirrors the space bar. Ladder-measured, since encounter frequency is
    what #24 spent its effort on.
-8. **A throw flies to where it was aimed.** Two faults, one subject. Power is currently
+8. **A throw flies to where it was aimed.** Fidelity, not taste: this is how the original
+   behaves, and ours does not. Two faults, one subject. Power is currently
    drained *continuously* in flight, so a throw that runs out dies wherever it happens to be
    and is collected by `nearestOpponent` — nearest to the **ball**, which is a defender
    standing on the trajectory. That reads as an interception by someone who, by design, is not
