@@ -470,6 +470,30 @@ function describeChallenge(from: number, rolls: number[], to: number): string {
  */
 export const DISPOSSESSED_RECOVERY = 1.2
 
+/**
+ * How many blockers a technique may actually brush aside.
+ *
+ * Never all of them. FFX's Jecht Shot "knocks away two players", which is a
+ * powerful advantage there because a defence can have more than two — here
+ * `MAX_ENGAGED` is two, so ignoring two ignored the entire contest, every time,
+ * unconditionally.
+ *
+ * The effect was not subtle. Measured head to head over forty-eight fixtures,
+ * the side built around Jecht scored fifty goals with the technique and *zero*
+ * without it — and gave him Blappa's better stats instead and it made no
+ * difference, because the shot was never being blocked in the first place. One
+ * player with this was worth more than every stat on the team put together.
+ *
+ * So a throw always faces somebody. The technique keeps its teeth — clearing one
+ * of two is still halving the defence — without being a rule that the contest
+ * does not happen. Written against `MAX_ENGAGED` rather than as a smaller number
+ * on the technique, so it stays true if the engaged limit ever moves.
+ */
+function blockersIgnored(technique: Technique | null, engaged: number): number {
+  const wanted = technique?.ignoresBlockers ?? 0
+  return Math.min(wanted, Math.max(0, engaged - 1))
+}
+
 /** Hand the ball to whoever won it, with whatever technique they had ready. */
 function concedePossession(
   state: MatchState,
@@ -906,7 +930,7 @@ function resolveShoot(
 
   const start = effectiveStat(carrier, 'sh') + (technique?.power ?? 0)
   // A technique that splits the defence waves that many of the rest through.
-  const facing = encounter.defenders.slice(technique?.ignoresBlockers ?? 0)
+  const facing = encounter.defenders.slice(blockersIgnored(technique, encounter.defenders.length))
   const contest = contestThrow(state, facing, start)
   const name = technique ? `${technique.name}! · ` : ''
   const sums = describeThrow('SH', start, contest.rolls, contest.power)
