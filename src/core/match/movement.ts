@@ -6,7 +6,8 @@ import type { Lunge } from './types'
  *
  * Distances scale with the pool so that enlarging it gives players room without
  * silently retuning the game: a throw across the same fraction of the pool costs
- * the same, and crossing it still takes the same few seconds.
+ * the same. Swim speed is the deliberate exception — see `SWIM_SCALE`, which is
+ * what makes a bigger pool take longer to cross rather than merely look wider.
  */
 export const REFERENCE_POOL_RADIUS = 50
 
@@ -27,14 +28,31 @@ export interface Movable extends Vec2 {
 }
 
 /**
+ * How much of the pool's size is passed on to swim speed.
+ *
+ * At 1 the pool cannot be made to feel bigger. Speed scaled with it exactly, so
+ * crossing took the same eight seconds whether the radius was 50 or 200 — the
+ * water grew and everyone grew faster to match. Three separate enlargements
+ * changed nothing about how long it took to arrive at goal, because that was
+ * never a function of the size.
+ *
+ * At 0 speed would ignore the pool entirely and a resize would retune the whole
+ * game by stealth, which is what the scaling was there to prevent. This sits
+ * between: a bigger pool now buys genuinely more time on the ball, and still
+ * buys less of it than the raw distance suggests.
+ */
+const SWIM_SCALE = 0.5
+
+/**
  * Top swim speed in world units per second, derived from SP.
  *
  * FFX's speed stat sits in the fifties to eighties rather than single figures,
- * so the mapping is scaled to put a typical player around twelve units a second
- * — roughly four seconds to cross the pool.
+ * so the mapping puts a typical player around twelve units a second at the
+ * reference size, and `SWIM_SCALE` decides how much of a larger pool they get
+ * back. See `POOL_RADIUS`: the two are measured together.
  */
 export function maxSpeed(sp: number): number {
-  return (4 + sp * 0.14) * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
+  return (4 + sp * 0.14) * (POOL_RADIUS / REFERENCE_POOL_RADIUS) ** SWIM_SCALE
 }
 
 /** Carrying the ball costs a little pace. */

@@ -44,8 +44,21 @@ import {
 
 export * from './types'
 
-/** Length of each half, in seconds. FFX uses five minutes; three keeps a demo brisk. */
-export const HALF_SECONDS = 180
+/**
+ * Length of each half, in seconds. FFX's own figure.
+ *
+ * Was three minutes, to keep a demo brisk. Restored alongside `SWIM_SCALE`,
+ * which is what made it necessary as well as merely faithful: slowing the swim
+ * so the pool takes crossing left a three-minute half with a quarter less
+ * football in it — shots fell from 20.8 a match to 15.6 and goals to 1.63.
+ * Five minutes puts both back and then some, at 26.3 shots and 165 encounters.
+ *
+ * It also takes some luck out. Twice the goals in a match means fewer of them
+ * decided by one, which costs the weakest side the flukey wins they were
+ * living on: Besaid's points fall by a third while their goals conceded *per
+ * minute* actually improve slightly.
+ */
+export const HALF_SECONDS = 300
 
 /** How long the half-time break holds before the restart. */
 export const HALF_TIME_SECONDS = 2.5
