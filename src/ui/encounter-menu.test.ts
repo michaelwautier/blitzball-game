@@ -476,6 +476,84 @@ describe('after a break lands', () => {
   })
 })
 
+/**
+ * The ball changing hands while the menu is open.
+ *
+ * The menu stays open across it — we ask the defence how it is challenging —
+ * so a half-finished question about *our* carrier can be re-rendered against
+ * *theirs*, and every row is then built from the wrong player's teammates. The
+ * engine refuses those answers, correctly, which is what makes it a trap: the
+ * player is left with a list nothing will accept and no way back out of it.
+ */
+describe('when possession changes hands mid-decision', () => {
+  /** Hand the ball to the opposition and put our defenders on them. */
+  function opponentBreaksAway(state: MatchState): void {
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    giveBallTo(state, find(state, 'away:doram'))
+    state.phase.encounter = {
+      kind: 'contested',
+      carrierId: 'away:doram',
+      defenders: [{ id: 'home:letty', attack: 8, block: 7 }],
+      endurance: 16,
+      thinkTimer: 0,
+      awaitingDefence: true,
+      defence: null,
+    }
+    menu.update(state)
+  }
+
+  it('asks how we are challenging, not who to pass to', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    pick(2)
+    expect(labels()).toContain('Tidus')
+
+    opponentBreaksAway(state)
+
+    expect(labels()).toContain('Tackle')
+  })
+
+  it('never offers the opposition as pass targets', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    pick(2)
+    opponentBreaksAway(state)
+
+    // How the trap was actually reached: the menu fell back to a full action
+    // list built around *their* carrier, and asking it to pass listed their side.
+    const pass = labels().indexOf('Pass')
+    if (pass >= 0) pick(pass + 1)
+
+    const theirs = state.players
+      .filter((player) => player.team === 'away')
+      .map((player) => player.def.name)
+    expect(labels().filter((label) => theirs.includes(label))).toEqual([])
+  })
+
+  it('accepts the answer it is showing', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    pick(2)
+    opponentBreaksAway(state)
+
+    press(' ')
+    expect(onDefend).toHaveBeenCalled()
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
+  it('starts again from the top when our own carrier changes', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    pick(2)
+    expect(labels()).toContain('Tidus')
+
+    // A teammate has it now, still contested. Nothing about the old question —
+    // Wakka's range, Wakka's teammates — applies to Tidus.
+    if (state.phase.kind !== 'encounter') throw new Error('expected an encounter')
+    giveBallTo(state, find(state, 'home:tidus'))
+    state.phase.encounter.carrierId = 'home:tidus'
+    menu.update(state)
+
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+  })
+})
+
 describe('going back', () => {
   it('steps back through each question in turn', () => {
     openMenu('contested')

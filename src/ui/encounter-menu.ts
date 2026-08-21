@@ -66,6 +66,8 @@ export class EncounterMenu {
   private selected = 0
   /** Who was on the carrier at the last render, to notice a break landing. */
   private lastDefenders = ''
+  /** Who was carrying at the last render, to notice possession changing hands. */
+  private lastCarrier = ''
 
   constructor(
     private readonly element: HTMLElement,
@@ -82,18 +84,29 @@ export class EncounterMenu {
       return
     }
 
+    const { encounter } = state.phase
+
     // Opening fresh: defending comes first when it is being asked, then the
     // target list if passing is the only thing on offer.
-    if (this.element.hidden) {
-      this.mode = state.phase.encounter.awaitingDefence
-        ? 'defence'
-        : state.phase.encounter.kind === 'distribution'
-          ? 'passTargets'
-          : 'actions'
+    if (this.element.hidden) this.restart(encounter)
+
+    // The ball has changed hands mid-question. Whatever was being asked was
+    // asked about somebody else, and every row on screen was built from their
+    // position and their teammates, so none of it survives: start the new
+    // encounter's own question from the top.
+    if (encounter.carrierId !== this.lastCarrier) {
+      this.lastCarrier = encounter.carrierId
+      this.restart(encounter)
     }
 
+    // While the defence is being asked, the defence is the only question there
+    // is. Belt and braces behind the check above — a step left over from our
+    // own carrier must never be re-rendered against an opponent's, or it offers
+    // *their* teammates as receivers and nothing will accept the answer.
+    if (encounter.awaitingDefence && this.mode !== 'defence') this.restart(encounter)
+
     // The defence answering hands the encounter over to the carrier.
-    if (this.mode === 'defence' && !state.phase.encounter.awaitingDefence) {
+    if (this.mode === 'defence' && !encounter.awaitingDefence) {
       this.mode = 'actions'
       this.signature = ''
     }
@@ -102,7 +115,7 @@ export class EncounterMenu {
     // still open. Start the decision again from the top rather than leaving the
     // player staring at the break question they have just answered — with one
     // fewer defender in the way, shooting may now be the thing to do.
-    const defenders = state.phase.encounter.defenders.map((d) => d.id).join(',')
+    const defenders = encounter.defenders.map((d) => d.id).join(',')
     if (defenders !== this.lastDefenders) {
       this.lastDefenders = defenders
       if (this.mode !== 'defence') {
@@ -118,6 +131,23 @@ export class EncounterMenu {
     this.signature = signature
     this.element.hidden = false
     this.render(state)
+  }
+
+  /**
+   * Ask this encounter's own question, from the top.
+   *
+   * Every step past the first is built from something the previous one chose,
+   * so a half-finished decision cannot be carried into a different encounter —
+   * it has to be dropped whole.
+   */
+  private restart(encounter: Encounter): void {
+    this.mode = encounter.awaitingDefence
+      ? 'defence'
+      : encounter.kind === 'distribution'
+        ? 'passTargets'
+        : 'actions'
+    this.pendingTargetId = null
+    this.signature = ''
   }
 
   /**
@@ -174,6 +204,7 @@ export class EncounterMenu {
     this.rows = []
     this.pendingTargetId = null
     this.lastDefenders = ''
+    this.lastCarrier = ''
     this.selected = 0
     this.encounterKind = 'contested'
   }
