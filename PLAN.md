@@ -213,10 +213,24 @@ against the ladder alone.
    move. Measuring at the *old* flight speed gives the same 1.92, so this is the freeze, not
    the slowdown. Winding scoring back toward 2.4 is a tuning question for its own PR rather
    than something to smuggle into a fidelity change.
-9. **A bigger pool and a closer camera.** Two constants, but not a free change:
-   `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
-   most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
-   goals a match rather than accepting whatever falls out.
+9. **A bigger pool and a closer camera** ✅ (#50). `POOL_RADIUS` 110 → 150, and the camera
+   stand-off cut from 0.30/0.58 of the pool to 0.18/0.34. Those are one change, not two: the
+   stand-off is a fraction of the pool, so enlarging the pool alone walks the camera away from
+   players who have not grown. It now sits closer to them in absolute terms than it ever did at
+   the old size — 27 and 51 units against 33 and 64.
+   Not free despite everything scaling, because the goal mouth and the bodies do not: the same
+   shot has a relatively smaller target, and the pool takes more crossing per point of pass
+   range. Goals fell 2.40 → 2.14, and `SHOT_DECAY_PER_UNIT` 0.47 → 0.468 brought them to 2.49.
+   The table order is identical to before at both ends of that. Besaid gain 55 points, the
+   Guado and Kilika lose about 18 each.
+   The third digit is not false precision. At this size 0.470 gives 2.14 and 0.468 gives 2.49 —
+   most of the range lives in that fifth of a hundredth, while 0.468 down to 0.460 only carries
+   it from 2.49 to 2.63. Shots arrive with single digits of power against a keeper's catch, so
+   a small change in what survives the journey tips a whole population across the line at once.
+   Re-measure rather than interpolate.
+   Two tests had distances pinned in raw units and so quietly stopped asserting anything at the
+   new size — a point "outside the pool" at 110 is comfortably inside it at 150. Both are
+   fractions of the radius now.
 11. **Camera: follow what matters, and behave the same everywhere** ✅ (#40). Pulled forward
     out of order, being bugs plus a small feature rather than the balance-affecting resize in
     9.

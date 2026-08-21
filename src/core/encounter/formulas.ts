@@ -38,11 +38,19 @@ export const PASS_DECAY_PER_UNIT = 0.06 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
  * matters more.
  *
  * Ours, like the pass rate — the source gives no number — and one of the three
- * constants that swing the whole board. Nudged from 0.5 to give back what
- * freezing the pool during flight took: #39 cost a fifth of all goals, 2.37 to
- * 1.92, because defenders no longer drift out of shape while the ball travels.
- * That was accepted as the price of fidelity, with the recovery left to its own
- * change. This is it. Measured over 600 fixtures: 1.93 to 2.46 a match.
+ * constants that swing the whole board. Moved twice, both times to hold the goal
+ * rate steady while something else changed underneath it: from 0.5 to 0.47 in
+ * #46, to give back what freezing the pool during flight took (#39 cost a fifth
+ * of all goals, 2.37 to 1.92, because defenders no longer drift out of shape
+ * while the ball travels), and to 0.468 alongside the enlarged pool.
+ *
+ * It is far more sensitive here than the digits suggest, and the extra one is
+ * not false precision. At the current size 0.470 gives 2.14 goals a match and
+ * 0.468 gives 2.49 — most of the range lives in that fifth of a hundredth,
+ * while 0.468 to 0.460 only carries it from 2.49 to 2.63. Shots arrive with
+ * single digits of power against a keeper's catch, so a small change in what
+ * survives the journey tips a whole population of them across the line at once.
+ * Re-measure rather than interpolate.
  *
  * Chosen over the alternatives because it moves the rate and nothing else. The
  * blocker coverage weights reach 2.25 and then saturate however far they fall,
@@ -51,7 +59,7 @@ export const PASS_DECAY_PER_UNIT = 0.06 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
  * with: four hundredths of the pool either way is the difference between one
  * goal a match and nearly six.
  */
-export const SHOT_DECAY_PER_UNIT = 0.47 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
+export const SHOT_DECAY_PER_UNIT = 0.468 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /**
  * Roll a contested stat: between half and one and a half times its value.

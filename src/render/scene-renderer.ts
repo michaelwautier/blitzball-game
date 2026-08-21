@@ -26,15 +26,25 @@ const COLOURS = {
 } as const
 
 /**
- * The broadcast camera, all as fractions of the pool so a resized pitch keeps
- * the same framing.
+ * The broadcast camera, all as fractions of the pool.
  *
  * Low and back, looking across the water rather than down onto it — the angle a
  * touchline camera takes, which is what puts the far wall of the sphere on the
  * horizon instead of filling the frame with pitch.
+ *
+ * Being fractions keeps the *pitch* framed the same through a resize, but not
+ * the *players*: bodies are a fixed size on purpose, so scaling the stand-off
+ * with the pool walks the camera away from them. Enlarging the pool would
+ * otherwise have shrunk everyone by the same third, which is why a closer
+ * camera and a bigger pool were always one change rather than two.
+ *
+ * Cut by far more than the resize, so the camera now sits closer to the player
+ * in absolute terms than it ever did at the old size: 27 and 51 units, against
+ * 33 and 64 before. This is the pair to nudge for a tighter or wider shot, and
+ * nothing else reads them.
  */
-const CAMERA_HEIGHT = POOL_RADIUS * 0.3
-const CAMERA_BACK = POOL_RADIUS * 0.58
+const CAMERA_HEIGHT = POOL_RADIUS * 0.18
+const CAMERA_BACK = POOL_RADIUS * 0.34
 
 /** How far the camera sits behind play, along the line to the goal. */
 const CAMERA_TRAIL = POOL_RADIUS * 0.1
