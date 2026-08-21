@@ -256,6 +256,25 @@ against the ladder alone.
     only question there is. All four regression tests were checked against the old code first
     — one of them originally passed there, guarding nothing, and was sharpened until it
     reproduced the trap the way a player reaches it.
+13. **Passes you can actually complete** ✅ (#43). The user could not work out why their passes
+    kept failing. The answer was arithmetic nobody was ever shown: PA is a passing *range*, the
+    engaged defenders' BL comes off it first, and at level one BL routinely exceeds PA outright.
+    Wakka passes at 3; a single defender blocking at 5 rolls 3–8 against him, so while he is
+    held **his passing range is zero** — every teammate on that list was a guaranteed fumble,
+    and the menu offered them all identically.
+    `passRange` (the inverse of `passDecay`) and `passReach` are the new shared truth. Target
+    rows now read *in range* / *at the limit* / *out of range*, and an unreachable one is toned
+    as the giveaway it is — but still choosable, because throwing one away to clear your own
+    half is a real decision.
+    The AI was doing the same thing far more often, and this is what measurement was for:
+    across 300 matches **3402 of its 10592 passes — a third — could not arrive even in the best
+    case**. `bestPassTarget` now filters on reach rather than merely preferring nearby, using
+    the *best* case so it rules out the impossible and leaves the gambles alone.
+    Ladder cost, and it is the honest kind: 2.00 → 1.89 goals a match, goalless 39% → 42%,
+    breaks 11.6 → 15.9 as a blocked passer takes the defender on instead. Those lost goals were
+    coming from free turnovers both sides were handing each other; the table order is unchanged.
+    Filtering on the *expected* case instead was tried and rejected — 1.71 goals a match, and it
+    dropped the Ronso from second to third for no gain in honesty.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

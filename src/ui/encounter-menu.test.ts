@@ -273,6 +273,72 @@ describe('the pass target list', () => {
   })
 })
 
+/**
+ * PA is a passing *range*, and the list never said so — a name and a distance in
+ * metres only help if you know which distances you can cover.
+ */
+describe('how far each pass can reach', () => {
+  /** Line the whole squad up at chosen distances from the carrier. */
+  function layOut(state: MatchState, carrierId: string, spots: Record<string, number>): void {
+    const carrier = find(state, carrierId)
+    carrier.x = 0
+    carrier.y = 0
+    for (const [id, distance] of Object.entries(spots)) {
+      const mate = find(state, id)
+      mate.x = distance
+      mate.y = 0
+    }
+    menu.update(state)
+  }
+
+  /** What the row for this teammate says. */
+  const rowFor = (name: string) => details()[labels().indexOf(name)] ?? ''
+
+  it('separates the certain, the hopeful and the impossible', () => {
+    // Letty passes at 10 against a blocker rolling 3–8, so between roughly 73
+    // and 257 units it depends on whether they read it.
+    const state = openMenu('contested', 'home:letty', 40)
+    layOut(state, 'home:letty', {
+      'home:tidus': 5,
+      'home:jassu': 150,
+      'home:datto': 300,
+      'home:wakka': 12,
+    })
+    pick(2)
+
+    expect(rowFor('Tidus')).toContain('in range')
+    expect(rowFor('Jassu')).toContain('at the limit')
+    expect(rowFor('Datto')).toContain('out of range')
+  })
+
+  /**
+   * The answer to "why can I never complete a pass?".
+   *
+   * Wakka passes at 3 and the defender on him blocks at 5, which rolls 3–8. The
+   * arithmetic leaves nothing at all: every pass he throws while held is a
+   * guaranteed fumble, at any distance. That was always true — the menu simply
+   * never said so, and offered every teammate as though one of them would work.
+   */
+  it('tells a passer the defence outweighs that they have no range at all', () => {
+    const state = openMenu('contested', 'home:wakka', 40)
+    layOut(state, 'home:wakka', { 'home:tidus': 3 })
+    pick(2)
+
+    expect(rowFor('Tidus')).toContain('out of range')
+    expect(buttons().every((b) => b.classList.contains('enc-risky'))).toBe(true)
+  })
+
+  it('still lets you throw one away', () => {
+    // Clearing your own half is worth a fumble at the far end. The row says
+    // what it is; it does not refuse the decision.
+    const state = openMenu('contested', 'home:wakka', 40)
+    layOut(state, 'home:wakka', { 'home:tidus': 3 })
+    pick(2)
+
+    expect(buttons().some((b) => b.disabled)).toBe(false)
+  })
+})
+
 describe('choosing how many to break past', () => {
   it('offers standing pat, then each defender in turn', () => {
     openMenu('contested')

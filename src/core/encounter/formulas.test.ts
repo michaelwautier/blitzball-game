@@ -10,6 +10,7 @@ import {
   catchStrength,
   expectedCatch,
   passDecay,
+  passRange,
   rollBounds,
   rollCatch,
   rollStat,
@@ -185,5 +186,19 @@ describe("a keeper's catch", () => {
     const rolls = Array.from({ length: 20000 }, () => rollCatch(9, rng))
     const mean = rolls.reduce((sum, r) => sum + r, 0) / rolls.length
     expect(mean).toBeCloseTo(expectedCatch(9), 0)
+  })
+})
+
+describe('passing range', () => {
+  it('is exactly the distance the power runs out over', () => {
+    // The inverse of the decay, so the two can never disagree about where a
+    // pass dies: at `passRange(p)` there is precisely nothing left.
+    expect(passDecay(passRange(10))).toBeCloseTo(10)
+    expect(passRange(0)).toBe(0)
+  })
+
+  it('is nothing at all for a throw with no power behind it', () => {
+    // A pass the defence has already eaten cannot travel a negative distance.
+    expect(passRange(-5)).toBe(0)
   })
 })

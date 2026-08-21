@@ -125,6 +125,18 @@ export function passDecay(distance: number): number {
   return distance * PASS_DECAY_PER_UNIT
 }
 
+/**
+ * How far a throw with this much power can carry before it arrives spent.
+ *
+ * The inverse of `passDecay`, and the number FFX is really describing when it
+ * calls PA a passing *range*: a pass is not weak or strong, it either gets there
+ * or it does not. Expressed in world units so it can be compared directly
+ * against the distance to a teammate.
+ */
+export function passRange(power: number): number {
+  return Math.max(0, power) / PASS_DECAY_PER_UNIT
+}
+
 /** Power lost by a shot crossing `distance` units. */
 export function shotDecay(distance: number): number {
   return distance * SHOT_DECAY_PER_UNIT
