@@ -7,6 +7,7 @@ import { ACTION_HP_COST } from '../core/encounter/formulas'
 import { findTechnique } from '../data/techniques'
 import type { Encounter, EncounterAction, MatchState, Player } from '../core/match/types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../data/teams'
+import { POOL_RADIUS } from '../core/pitch'
 
 /**
  * The menu holds real logic — four steps, three kinds of decision, technique
@@ -295,14 +296,17 @@ describe('how far each pass can reach', () => {
   const rowFor = (name: string) => details()[labels().indexOf(name)] ?? ''
 
   it('separates the certain, the hopeful and the impossible', () => {
-    // Letty passes at 10 against a blocker rolling 3–8, so between roughly 73
-    // and 257 units it depends on whether they read it.
+    // Letty passes at 10 against a blocker rolling 3–8. Decay scales inversely
+    // with the pool, so his reach is a fixed *fraction* of it — roughly two
+    // thirds of the radius certain, and a little over twice it at the outside.
+    // Written as fractions for that reason: in raw units these three rows all
+    // said something different every time the pool was resized.
     const state = openMenu('contested', 'home:letty', 40)
     layOut(state, 'home:letty', {
-      'home:tidus': 5,
-      'home:jassu': 150,
-      'home:datto': 300,
-      'home:wakka': 12,
+      'home:tidus': POOL_RADIUS * 0.05,
+      'home:jassu': POOL_RADIUS * 1.36,
+      'home:datto': POOL_RADIUS * 2.8,
+      'home:wakka': POOL_RADIUS * 0.11,
     })
     pick(2)
 

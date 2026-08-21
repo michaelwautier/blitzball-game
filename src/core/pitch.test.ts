@@ -30,11 +30,14 @@ describe('pitch geometry', () => {
   })
 
   it('pulls exterior points back onto the boundary along the same heading', () => {
-    const clamped = clampToPool({ x: 120, y: 0 }, 2)
+    // Expressed as multiples of the radius rather than in raw units: a point
+    // that is outside the pool at one size is comfortably inside it at another,
+    // and this asserted nothing at all the moment the pool was enlarged.
+    const clamped = clampToPool({ x: POOL_RADIUS * 1.1, y: 0 }, 2)
     expect(clamped.x).toBeCloseTo(POOL_RADIUS - 2, 6)
     expect(clamped.y).toBeCloseTo(0, 6)
 
-    const diagonal = clampToPool({ x: 100, y: 100 })
+    const diagonal = clampToPool({ x: POOL_RADIUS, y: POOL_RADIUS })
     expect(Math.hypot(diagonal.x, diagonal.y)).toBeCloseTo(POOL_RADIUS, 6)
     expect(diagonal.x).toBeCloseTo(diagonal.y, 6)
   })

@@ -14,8 +14,19 @@
  * to give players more or less room. Bodies deliberately do *not* scale with it:
  * that is what turns a bigger pool into more space rather than the same game
  * drawn larger.
+ *
+ * Raised from 110 for exactly that reason. It is not free, despite everything
+ * scaling: the goal mouth and the bodies stay the size they were, so the same
+ * shot has a relatively smaller target and the pool takes more crossing per
+ * point of pass range. Goals fell from 2.40 a match to 2.14 on the strength of
+ * it, and `SHOT_DECAY_PER_UNIT` was re-tuned to bring them back — see the note
+ * there before moving this again, because the two have to be measured together.
+ *
+ * The camera stand-off in `scene-renderer.ts` is the other half of the change:
+ * it scales with this, so enlarging the pool alone walks the camera away from
+ * players who have not grown.
  */
-export const POOL_RADIUS = 110
+export const POOL_RADIUS = 150
 
 /** Distance from the origin to each goal line. Sits just inside the boundary. */
 export const GOAL_X = POOL_RADIUS * 0.92
