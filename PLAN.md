@@ -289,6 +289,25 @@ against the ladder alone.
     Ladder: 1.89 → 1.96 goals a match, goalless 42% → 39%, table order unchanged. It touches
     only the user's side, which is the home side in every simulated fixture, so it is worth
     watching against **#32** rather than assumed neutral.
+15. **Scoring back to where it was** ✅ (#46). The debt #39 left: freezing the pool while the
+    ball is in the air cost a fifth of all goals, 2.37 → 1.92, and the note said winding it
+    back was a tuning question for its own PR. This is that PR, and it is also the prerequisite
+    for the resize in 9, which is specified as "tuned back to roughly 2.4" — you cannot tune
+    back to a figure you are not starting from.
+    `SHOT_DECAY_PER_UNIT` 0.5 → 0.47. Over 600 fixtures: **1.93 → 2.46 goals a match**, goalless
+    40% → 35%, with the table order and spread unchanged.
+    Three levers were swept before choosing. `SHOOTING_STANDOFF` is unusable as an aim: 0.18
+    gives 5.76 goals a match and 0.26 gives 0.98, from 0.22's 1.96. The blocker coverage weights
+    reach 2.25 and then saturate — 0.35, 0.3, 0.25 and 0.2 all land within 0.03 of each other —
+    and on the way they redistribute strength between the sides, costing Besaid a quarter of
+    their points. Shot decay was the only one that moved the rate and nothing else.
+    Honest about the cost: it helps the Guado a great deal (207 → 240 points, and 35:41 becomes
+    88:48, so they finally score) and hurts Kilika, who concede 308 → 470 while scoring 6 → 8.
+    Lowering the decay lets everyone score, and Kilika have no defence to stop anyone. Both
+    halves of **#25** move, in opposite directions.
+    `LADDER_RUNS=20 npm run ladder` was added for this: every number above is the 600-fixture
+    reading, not the 300 the sweep was done on, because a balance constant should not move on
+    one seed family.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
@@ -348,6 +367,13 @@ scoring back up is a separate decision.
 The most sensitive numbers, in order: `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT`, and the
 blocker coverage weights. Small moves in any of them swing the whole board — change one at a
 time and re-run the ladder.
+
+Swept properly in #46, and worth recording so the next tune starts from knowledge rather than
+from the same three runs. `SHOOTING_STANDOFF` at 0.18, 0.22 and 0.26 of the pool gives 5.76,
+1.96 and 0.98 goals a match: it cannot be aimed with. `SHOT_DECAY_PER_UNIT` is close to linear
+over 0.42–0.50, about 0.2 goals a match per hundredth, and leaves the table order alone — it is
+the lever to reach for. The blocker coverage weights saturate: everything from 0.35 down to 0.2
+lands at 2.25, and all of it comes out of the weaker sides' points.
 
 Two known problems live in the issue tracker rather than in this file. **#25**: Kilika and the Guado barely score, and the Guado went a
 full simulated season without a single goal. It is faithful to the data — neither side has a

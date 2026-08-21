@@ -100,9 +100,14 @@ describe('the report as text', () => {
  * sets the variable that turns it on and prints the table.
  */
 describe.skipIf(!process.env.LADDER)('the full ladder', () => {
+  // `LADDER_RUNS=20 npm run ladder` doubles the sample. The extra runs are new
+  // seeds rather than repeats, which is how to tell a real effect from a lucky
+  // one before a balance constant is moved on the strength of it.
+  const runs = Number(process.env.LADDER_RUNS ?? DEFAULT_RUNS)
+
   it('plays the whole league', () => {
-    const report: LadderReport = runLadder(DEFAULT_RUNS, TEAMS)
+    const report: LadderReport = runLadder(runs, TEAMS)
     process.stderr.write(`\n${formatLadder(report)}\n`)
-    expect(report.matches).toBe(TEAMS.length * (TEAMS.length - 1) * DEFAULT_RUNS)
-  }, 600_000)
+    expect(report.matches).toBe(TEAMS.length * (TEAMS.length - 1) * runs)
+  }, 1_800_000)
 })
