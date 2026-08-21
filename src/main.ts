@@ -1,5 +1,6 @@
 import { createLoop, TICK_SECONDS } from './core/loop'
 import {
+  announce,
   cancelActionMenu,
   createMatch,
   requestActionMenu,
@@ -32,6 +33,8 @@ import { MatchSummary } from './ui/match-summary'
 import { Scoreboard } from './ui/scoreboard'
 import { StatPanel } from './ui/stat-panel'
 import { BallMarker } from './ui/ball-marker'
+import { Sounds } from './audio/sounds'
+import { snapshot, soundsBetween, type AudioSnapshot } from './audio/events'
 import type { TeamDef } from './data/types'
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -50,6 +53,9 @@ const scoreboard = new Scoreboard(element('#scoreboard'), element('#banner'))
 const overlay = new DebugOverlay(element('#debug'))
 const statPanel = new StatPanel(element('#stats'))
 const ballMarker = new BallMarker(element('#ball-marker'))
+const sounds = new Sounds()
+/** What the match sounded like last frame, to hear the difference this one. */
+let heard: AudioSnapshot | null = null
 const input = new KeyboardInput()
 const slot = localStorageSlot()
 
@@ -162,6 +168,11 @@ function save(): void {
   slot.write(serialise(season, squad.all()))
 }
 
+/** Say which way the mute went, using the banner the match already has. */
+function announceMute(muted: boolean): void {
+  if (state) announce(state, muted ? 'Sound off' : 'Sound on')
+}
+
 const loop = createLoop({
   update: (dt) => {
     if (state) stepMatch(state, dt, input.read())
@@ -175,6 +186,12 @@ const loop = createLoop({
     scoreboard.update(state)
     statPanel.update(state, menu.previewsShot())
     ballMarker.update(state, scene.ballMarker())
+
+    // Read off the phase machine from outside, exactly as the renderer reads
+    // positions: the simulation is never told anyone is listening.
+    const now = snapshot(state)
+    if (heard) for (const sound of soundsBetween(heard, now)) sounds.play(sound)
+    heard = now
     menu.update(state)
     summary.update(state, () => {
       // Banked exactly once: the summary asks for this only on the frame the
@@ -194,7 +211,12 @@ window.addEventListener('resize', () => {
   radar.resize()
 })
 window.addEventListener('keydown', (event) => {
+  // Any key is the gesture browsers insist on before audio may start, and it
+  // also revives a context the browser suspended while the tab was away.
+  sounds.wake()
+
   if (event.key === '~' || event.key === '`') overlay.toggle()
+  if (event.key === 'm' || event.key === 'M') announceMute(sounds.toggle())
   if (!state) return
 
   // The same key means the same thing on both sides of the ball: take charge of

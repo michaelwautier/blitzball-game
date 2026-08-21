@@ -405,6 +405,21 @@ against the ladder alone.
     `previewsShot()` is the menu's answer, alongside `previewTargetId()` — which row a cursor
     sits on is a question the UI asks, never something written into match state.
     UI only; no ladder.
+20. **Sound** ✅ (#56). Shoot, pass, tackle, goal, save, breakthrough, the encounter opening,
+    and the whistle. **Synthesised rather than sampled** — oscillators and filtered noise built
+    at the moment each plays — so the repository stays free of binary assets and licences, and
+    every sound sits where all the other tunables do: in code, as named numbers with a note on
+    why. All of it runs through one low-pass, because all of it happens underwater; that single
+    filter is what stops a set of dry synth blips sounding like a menu.
+    Split in two, along the line that decides what is worth testing. `audio/events.ts` derives
+    *what happened* from two frames of the phase machine and is pure and tested — sixteen tests,
+    including a full match asserting no frame ever reports both a goal and a save, or both a
+    tackle and a breakthrough. `audio/sounds.ts` decides what a tackle sounds like, which is
+    taste and is not tested.
+    The engine is never told anyone is listening: the sounds are read from outside exactly as
+    the renderer reads positions. `CLAUDE.md` now says so as a rule, since an event fired *for*
+    the presentation is the tempting thing to add and the thing to avoid.
+    `m` mutes. Nothing plays before the first keypress, which browsers require anyway.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
