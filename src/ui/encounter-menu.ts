@@ -341,7 +341,7 @@ export class EncounterMenu {
 
     const techniques = defensiveTechniques(state, encounter).map((technique) => ({
       label: technique.name,
-      detail: `${technique.hpCost} HP · ${technique.description}`,
+      detail: `+${technique.power} AT · ${technique.hpCost} HP · ${technique.description}`,
       tone: 'safe' as const,
       effect: { defend: technique.id },
       enabled: true,
@@ -530,11 +530,16 @@ export class EncounterMenu {
       enabled: true,
     }
 
+    const boost = kind === 'pass' ? 'PA' : 'SH'
     const techniques = techniquesOf(carrier.def.techniques, kind).map((technique) => {
       const affordable = canAfford(carrier, baseCost + technique.hpCost)
       return {
         label: technique.name,
-        detail: `${baseCost + technique.hpCost} HP · ${technique.description}`,
+        // What it buys, before what it costs. A technique adds to the throw as
+        // well as doing something to whoever is in the way, and the bonus was
+        // nowhere on screen — so the choice read as pure HP for an effect.
+        detail:
+          `+${technique.power} ${boost} · ${baseCost + technique.hpCost} HP · ${technique.description}`,
         tone: affordable ? ('safe' as const) : ('risky' as const),
         effect: { commit: this.actionFor(kind, technique) },
         enabled: affordable,

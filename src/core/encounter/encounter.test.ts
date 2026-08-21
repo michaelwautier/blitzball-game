@@ -18,6 +18,8 @@ import { giveBallTo } from '../match/possession'
 import type { Encounter, MatchState, Player } from '../match/types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
 import { bestPassTarget } from '../ai/decisions'
+import { submitDefence } from '../match/state'
+import { findTechnique } from '../../data/techniques'
 import { attackDirection } from '../match/formation'
 
 const newMatch = (seed = 'enc') => createMatch(BESAID_AUROCHS, LUCA_GOERS, seed)
@@ -956,5 +958,101 @@ describe('watching a breakthrough happen', () => {
     // breath — the space bar that confirmed the breakthrough is the one that
     // challenges, which is exactly how it used to happen.
     expect(carrier.recovery).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * A technique that helps you win the ball, rather than decorating a tackle you
+ * had already won.
+ *
+ * FFX gives every tackle technique AT+3. Ours gave nothing: `power` was zero on
+ * both of them, and the technique fired *after* the challenge was decided — so
+ * it could inflict a condition but never affect whether the tackle landed.
+ */
+describe('tackle techniques', () => {
+  /** Letty knows Venom Tackle; put him on an opposition carrier. */
+  function lettyOn(seed: string): { state: MatchState; letty: Player; encounter: Encounter } {
+    const state = newMatch(seed)
+    const carrier = find(state, 'away:bickson')
+    carrier.x = 0
+    carrier.y = 0
+    giveBallTo(state, carrier)
+
+    const letty = find(state, 'home:letty')
+    letty.x = ENGAGE_RADIUS - 1
+    letty.y = 0
+    for (const other of state.players.filter((p) => p.team === 'home' && p.id !== letty.id)) {
+      other.x = -POOL_RADIUS * 0.8
+      other.y = POOL_RADIUS * 0.5
+    }
+
+    const encounter = openEncounter(state, carrier, [letty])
+    return { state, letty, encounter }
+  }
+
+  it('counts towards the attack, not just the aftermath', () => {
+    const { state, letty, encounter } = lettyOn('counts')
+    const technique = findTechnique('venom-tackle')
+
+    expect(technique.power).toBeGreaterThan(0)
+    // The snapshot is what gets rolled, and it carries the bonus.
+    expect(encounter.defenders[0]!.attack).toBe(effectiveStat(letty, 'at') + technique.power)
+    void state
+  })
+
+  it('advertises the range it is actually going to roll', () => {
+    // The menu reads `tackleRange` off the snapshot. If the bonus reached the
+    // roll without reaching the snapshot, a tackle could exceed the odds the
+    // carrier was shown — which is the one thing the snapshot exists to stop.
+    const { state, encounter } = lettyOn('advertised')
+    const carrier = find(state, 'away:bickson')
+    encounter.endurance = 400
+    state.endurance = 400
+
+    const { min, max } = tackleRange(encounter.defenders)
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+    for (let i = 0; i < 300 && state.phase.kind === 'challenge'; i++) stepMatch(state, 1 / 60)
+
+    const spent = 400 - state.endurance
+    expect(spent).toBeGreaterThanOrEqual(min)
+    expect(spent).toBeLessThanOrEqual(max)
+    void carrier
+  })
+
+  it('is paid for when it is thrown, not only when it works', () => {
+    const { state, letty, encounter } = lettyOn('paid')
+    encounter.endurance = 400
+    state.endurance = 400
+    const before = letty.hp
+
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 1 })
+    for (let i = 0; i < 300 && state.phase.kind === 'challenge'; i++) stepMatch(state, 1 / 60)
+
+    // The carrier had endurance to spare, so Letty lost the challenge — and
+    // still spent the HP, because the technique went in either way.
+    expect(state.ball.carrier).toBe('away:bickson')
+    expect(letty.hp).toBeLessThan(before)
+  })
+
+  it('drops the bonus when the defence chooses a plain tackle', () => {
+    const { state, letty, encounter } = lettyOn('plain')
+    encounter.awaitingDefence = true
+    state.phase = { kind: 'encounter', encounter }
+
+    submitDefence(state, null)
+
+    expect(encounter.defence).toEqual({ techniqueId: null })
+    expect(encounter.defenders[0]!.attack).toBe(effectiveStat(letty, 'at'))
+  })
+
+  it('keeps it when the defence asks for the technique by name', () => {
+    const { state, letty, encounter } = lettyOn('by-name')
+    encounter.awaitingDefence = true
+    state.phase = { kind: 'encounter', encounter }
+
+    submitDefence(state, 'venom-tackle')
+
+    const expected = effectiveStat(letty, 'at') + findTechnique('venom-tackle').power
+    expect(encounter.defenders[0]!.attack).toBe(expected)
   })
 })
