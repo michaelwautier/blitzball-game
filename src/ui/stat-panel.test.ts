@@ -162,3 +162,76 @@ describe('the defenders on them', () => {
     expect(element.querySelectorAll('.sp-defender')).toHaveLength(0)
   })
 })
+
+/**
+ * The keeper, while a shot is being weighed.
+ *
+ * Their catching is the last thing between the throw and the net, and the only
+ * figure in the decision that appears nowhere else — the menu's odds stop at the
+ * defenders in front of the shooter.
+ */
+describe('the keeper on a shot', () => {
+  const names = () => [...element.querySelectorAll('.sp-name')].map((n) => n.textContent ?? '')
+  const keeperRow = () => element.querySelector('.sp-keeper')
+
+  it('appears only while a shot is what is being considered', () => {
+    const state = caught('home:wakka', ['away:doram'])
+
+    panel.update(state, false)
+    expect(keeperRow(), 'the keeper was up before a shot was chosen').toBeNull()
+
+    panel.update(state, true)
+    expect(keeperRow()).not.toBeNull()
+  })
+
+  it('is the keeper of the goal being shot at, not our own', () => {
+    const state = caught('home:wakka', ['away:doram'])
+    panel.update(state, true)
+
+    // Wakka attacks the away goal, so it is their keeper who has to catch it.
+    expect(names()).toContain(find(state, 'away:raudy').def.name)
+    expect(names()).not.toContain(find(state, 'home:keepa').def.name)
+  })
+
+  it('shows the catching the shot has to beat', () => {
+    const state = caught('home:wakka', ['away:doram'])
+    panel.update(state, true)
+
+    const nedus = find(state, 'away:raudy')
+    expect(keeperRow()?.textContent).toContain(String(effectiveStat(nedus, 'ca')))
+    expect(keeperRow()?.textContent).toContain('CA')
+  })
+
+  it('shows what they can catch now rather than what is printed on them', () => {
+    const state = caught('home:wakka', ['away:doram'])
+    const raudy = find(state, 'away:raudy')
+    applyStatus(raudy, { kind: 'wither', stat: 'ca', duration: 10, magnitude: 0.4 })
+
+    panel.update(state, true)
+
+    // Withered, and the engine will roll the reduced figure — so that is the
+    // figure a shooter is entitled to see.
+    expect(effectiveStat(raudy, 'ca')).toBeLessThan(raudy.stats.ca)
+    expect(keeperRow()?.textContent).toContain(String(effectiveStat(raudy, 'ca')))
+  })
+
+  it('goes away again when the choice moves off shooting', () => {
+    const state = caught('home:wakka', ['away:doram'])
+    panel.update(state, true)
+    expect(keeperRow()).not.toBeNull()
+
+    panel.update(state, false)
+    expect(keeperRow(), 'the keeper stayed up after the choice moved on').toBeNull()
+  })
+
+  it('sits below the defenders, not above them', () => {
+    // Reading order is the decision in order: who has it, who is in the way,
+    // and who is behind them.
+    const state = caught('home:wakka', ['away:doram', 'away:balgerda'])
+    panel.update(state, true)
+
+    const classes = [...element.querySelectorAll('.sp-row')].map((r) => r.className)
+    expect(classes.at(0)).toContain('sp-carrier')
+    expect(classes.at(-1)).toContain('sp-keeper')
+  })
+})

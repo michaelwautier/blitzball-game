@@ -1,5 +1,5 @@
 import { effectiveStat } from '../core/match/stats'
-import { playerById } from '../core/match/queries'
+import { keeperFor, opponentOf, playerById } from '../core/match/queries'
 import type { Encounter, MatchState, Player } from '../core/match/types'
 import type { PlayerStats } from '../data/types'
 
@@ -25,7 +25,7 @@ export class StatPanel {
 
   constructor(private readonly element: HTMLElement) {}
 
-  update(state: MatchState): void {
+  update(state: MatchState, shooting = false): void {
     const carrier = state.ball.carrier ? playerById(state, state.ball.carrier) : undefined
     const encounter = state.phase.kind === 'encounter' ? state.phase.encounter : undefined
 
@@ -34,7 +34,12 @@ export class StatPanel {
       return
     }
 
-    const signature = this.signatureFor(carrier, encounter)
+    // Only while a shot is the thing being considered. Standing there
+    // permanently would be noise: the keeper decides nothing about a pass or a
+    // breakthrough, and the panel is meant to be the numbers for *this* choice.
+    const keeper = shooting ? keeperFor(state, opponentOf(carrier.team)) : undefined
+
+    const signature = this.signatureFor(carrier, encounter, keeper)
     if (signature === this.signature) return
 
     this.signature = signature
@@ -42,6 +47,7 @@ export class StatPanel {
     this.element.replaceChildren(
       this.carrierRow(carrier),
       ...this.defenderRows(state, carrier, encounter),
+      ...(keeper ? [keeperRow(keeper)] : []),
     )
   }
 
@@ -51,13 +57,18 @@ export class StatPanel {
     this.signature = ''
   }
 
-  private signatureFor(carrier: Player, encounter: Encounter | undefined): string {
+  private signatureFor(
+    carrier: Player,
+    encounter: Encounter | undefined,
+    keeper: Player | undefined,
+  ): string {
     const defenders = encounter?.defenders ?? []
     return [
       carrier.id,
       Math.round(carrier.hp),
       ...STATS_ON_THE_BALL.map((key) => effectiveStat(carrier, key)),
       ...defenders.map((d) => `${d.id}:${d.attack}:${d.block}`),
+      keeper ? `gk:${keeper.id}:${effectiveStat(keeper, 'ca')}:${Math.round(keeper.hp)}` : '',
     ].join('|')
   }
 
@@ -96,6 +107,21 @@ export class StatPanel {
       ]
     })
   }
+}
+
+/**
+ * The keeper a shot would have to beat, shown while one is being considered.
+ *
+ * Their catching is the last thing between the throw and the net, and it is the
+ * one number a shooter cannot see anywhere else — the menu's odds stop at the
+ * defenders in front of them. Effective rather than printed, like every other
+ * figure here: a poisoned keeper really does catch at half strength.
+ */
+function keeperRow(keeper: Player): HTMLElement {
+  return row('sp-keeper', keeper.def.name, [
+    ['HP', Math.round(keeper.hp)],
+    ['CA', effectiveStat(keeper, 'ca')],
+  ])
 }
 
 /** What matters about the player on the ball, in FFX's order. */

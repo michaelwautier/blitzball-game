@@ -794,3 +794,47 @@ describe('keyboard hygiene', () => {
     expect(onAction).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Which choice the cursor is on, asked so the stat panel can put the keeper up
+ * while a shot is being weighed.
+ */
+describe('knowing a shot is being considered', () => {
+  it('says nothing while the menu is shut', () => {
+    expect(menu.previewsShot()).toBe(false)
+  })
+
+  it('is true on the shoot row and false on the others', () => {
+    openMenu('contested', 'home:wakka', 40)
+    expect(labels()).toEqual(['Breakthrough', 'Pass', 'Shoot'])
+
+    const said: Record<string, boolean> = {}
+    for (const label of labels()) {
+      while (selectedLabel() !== label) press('ArrowDown')
+      said[label] = menu.previewsShot()
+    }
+
+    expect(said).toEqual({ Breakthrough: false, Pass: false, Shoot: true })
+  })
+
+  it('stays true through the technique step, having chosen to shoot', () => {
+    // Wakka knows Venom Shot, so choosing to shoot opens a further question —
+    // and the keeper is still exactly who that question is about.
+    const state = openMenu('contested', 'home:wakka', 40)
+    expect(state.phase.kind).toBe('encounter')
+
+    while (selectedLabel() !== 'Shoot') press('ArrowDown')
+    press(' ')
+    expect(labels()).toContain('Straight shot')
+    expect(menu.previewsShot()).toBe(true)
+  })
+
+  it('is false while choosing who to pass to', () => {
+    openMenu('contested', 'home:wakka', 40)
+    while (selectedLabel() !== 'Pass') press('ArrowDown')
+    press(' ')
+
+    expect(labels()).toContain('Tidus')
+    expect(menu.previewsShot()).toBe(false)
+  })
+})
