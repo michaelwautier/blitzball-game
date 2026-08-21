@@ -464,6 +464,7 @@ function maybeOpenEncounter(state: MatchState): void {
   if (defenders.length === 0) return
 
   state.phase = { kind: 'encounter', encounter: openEncounter(state, carrier, defenders) }
+  focusOnEncounter(state, defenders)
   // One line per defender, as FFX calls them out. Nearest first, matching both
   // the order they are challenged in and the order the menu lists them.
   announce(state, defenders.map((d) => `${d.def.name} on defense!`).join('\n'))
@@ -503,6 +504,7 @@ export function requestChallenge(state: MatchState): boolean {
   const defenders = [challenger, ...others].slice(0, MAX_ENGAGED)
 
   state.phase = { kind: 'encounter', encounter: openEncounter(state, carrier, defenders) }
+  focusOnEncounter(state, defenders)
   announce(state, defenders.map((d) => `${d.def.name} on defense!`).join('\n'))
   return true
 }
@@ -629,6 +631,23 @@ function applyEncounterAction(
 
   // Pass and shoot move to a flight themselves; anything else resumes open play.
   if (state.phase.kind === 'encounter') state.phase = { kind: 'play' }
+}
+
+/**
+ * Hand control to whoever is actually in the encounter.
+ *
+ * The menu asks how *your* defence is challenging, and the camera follows
+ * whoever you are steering — so being asked that question while looking at a
+ * player who is nowhere near it is being asked to decide blind. It happens
+ * because control is sticky by design: the defender who closed the carrier down
+ * is very often not the one you were swimming.
+ *
+ * Nearest first, matching the order the menu names them in. Only ever moves
+ * control *into* the confrontation, never out of one.
+ */
+function focusOnEncounter(state: MatchState, defenders: readonly Player[]): void {
+  const ours = defenders.find((player) => player.team === USER_TEAM && player.slot !== 'GK')
+  if (ours) state.controlled = ours.id
 }
 
 /**

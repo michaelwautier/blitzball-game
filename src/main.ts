@@ -31,6 +31,7 @@ import { LeagueScreen } from './ui/league-screen'
 import { MatchSummary } from './ui/match-summary'
 import { Scoreboard } from './ui/scoreboard'
 import { StatPanel } from './ui/stat-panel'
+import { BallMarker } from './ui/ball-marker'
 import type { TeamDef } from './data/types'
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -48,6 +49,7 @@ const radar = new Renderer(element<HTMLCanvasElement>('#radar'), { compact: true
 const scoreboard = new Scoreboard(element('#scoreboard'), element('#banner'))
 const overlay = new DebugOverlay(element('#debug'))
 const statPanel = new StatPanel(element('#stats'))
+const ballMarker = new BallMarker(element('#ball-marker'))
 const input = new KeyboardInput()
 const slot = localStorageSlot()
 
@@ -172,6 +174,7 @@ const loop = createLoop({
     radar.draw(state, alpha)
     scoreboard.update(state)
     statPanel.update(state)
+    ballMarker.update(state, scene.ballMarker())
     menu.update(state)
     summary.update(state, () => {
       // Banked exactly once: the summary asks for this only on the frame the

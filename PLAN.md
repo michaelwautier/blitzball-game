@@ -370,6 +370,28 @@ against the ladder alone.
     on the ladder as it happens, because a beaten defender's recovery already covers it, but
     wrong. And separating bodies during the challenge freeze, which the encounter freeze
     forbids, was worth 0.17 goals a match on its own.
+18. **Knowing where play is** ✅ (#54). Two halves of one complaint: defending with a player
+    far from the ball, you cannot see what you are defending against.
+    **An encounter now takes control with it.** The menu asks how *your* defence is challenging,
+    and the camera follows whoever you are steering — so being asked that while looking at a
+    player nowhere near it is being asked to decide blind. It happens because control is sticky
+    by design (see 7), and the defender who closed the carrier down is very often not the one
+    you were swimming. `focusOnEncounter` hands control to a defender who is actually in it,
+    nearest first, matching the order the menu names them. It only ever moves control *into* a
+    confrontation, never out of one.
+    **An off-screen ball gets an arrow**, riding the edge of the frame on its true bearing, in
+    the carrier's colour, with the distance *you* have to swim rather than the camera's.
+    Zooming out to fit was considered and rejected on geometry: the pool is 276 units goal to
+    goal against a 51-unit camera stand-off, so fitting both at the extremes reduces everyone to
+    specks — and variable framing is the family of change that produced the inverted-controls
+    problem in 11. The close camera was asked for twice; it should not quietly undo itself
+    whenever play stretches.
+    The projection maths is pure and tested, `render/off-screen.ts`. The case worth knowing:
+    a perspective projection mirrors whatever is *behind* the camera through the origin, so a
+    carrier directly behind you projects to the middle of the frame and reads as visible and
+    dead ahead. Two of the seven tests are about that.
+    Ladder: 2.61 → 2.58 goals a match, table order unchanged — the focus change moves which
+    player the simulation steers, which is why it was measured at all.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
