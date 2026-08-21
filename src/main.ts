@@ -173,7 +173,7 @@ const loop = createLoop({
     scene.draw(state, alpha, TICK_SECONDS, menu.previewTargetId())
     radar.draw(state, alpha)
     scoreboard.update(state)
-    statPanel.update(state)
+    statPanel.update(state, menu.previewsShot())
     ballMarker.update(state, scene.ballMarker())
     menu.update(state)
     summary.update(state, () => {

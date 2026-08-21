@@ -392,6 +392,19 @@ against the ladder alone.
     dead ahead. Two of the seven tests are about that.
     Ladder: 2.61 → 2.58 goals a match, table order unchanged — the focus change moves which
     player the simulation steers, which is why it was measured at all.
+19. **The keeper, while you are deciding to beat them** ✅ (#55). The stat panel showed the
+    carrier and whoever was on them, and the menu's odds stop at those defenders — so the one
+    number that actually decides a shot, the catching behind them, appeared nowhere at all.
+    A keeper row now sits beneath the defenders while a shot is the choice under the cursor,
+    including through the technique step, since having chosen to shoot the keeper is still
+    exactly who the question is about. It is the keeper of the goal being attacked, and the
+    effective figure rather than the printed one, like everything else in that panel: a withered
+    keeper really does catch at reduced strength, and that is the number the engine will roll.
+    Deliberately not permanent. The keeper decides nothing about a pass or a breakthrough, and
+    the panel is meant to be the numbers for *this* choice rather than a stat sheet.
+    `previewsShot()` is the menu's answer, alongside `previewTargetId()` — which row a cursor
+    sits on is a question the UI asks, never something written into match state.
+    UI only; no ladder.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

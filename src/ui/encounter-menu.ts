@@ -166,6 +166,28 @@ export class EncounterMenu {
     return this.rows[this.selected]?.targetId ?? null
   }
 
+  /**
+   * Whether the choice under the cursor is a shot.
+   *
+   * Asked so the stat panel can put the keeper up while you are considering
+   * beating them. Like `previewTargetId`, this is a question the UI asks of the
+   * menu rather than anything written into match state: which row a cursor is
+   * sitting on is not part of the game.
+   *
+   * True through the technique step too — having chosen to shoot, the keeper is
+   * still exactly who the decision is about.
+   */
+  previewsShot(): boolean {
+    if (this.element.hidden) return false
+    if (this.mode === 'shootTechnique') return true
+    if (this.mode !== 'actions') return false
+
+    const effect = this.rows[this.selected]?.effect
+    if (!effect) return false
+    if ('open' in effect) return effect.open === 'shootTechnique'
+    return 'commit' in effect && effect.commit.kind === 'shoot'
+  }
+
   dispose(): void {
     this.element.removeEventListener('click', this.onClick)
     this.element.removeEventListener('pointermove', this.onPointerMove)

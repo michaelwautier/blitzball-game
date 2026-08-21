@@ -326,6 +326,23 @@
         font-size: 12px;
         opacity: 0.92;
       }
+      /*
+       * The keeper, shown only while a shot is being weighed. Tinted with the
+       * opposition like a defender, but kept distinct: they are not in the
+       * encounter, they are what is behind it.
+       */
+      .sp-keeper {
+        background: linear-gradient(to right, transparent, rgb(60 12 12 / 0.5));
+        border-bottom-color: rgb(255 212 121 / 0.65);
+        font-size: 12px;
+        opacity: 0.92;
+      }
+      .sp-keeper .sp-name::before {
+        content: 'GK ';
+        opacity: 0.55;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
       .sp-stat b {
         color: #ffb35c;
         font-weight: 700;
