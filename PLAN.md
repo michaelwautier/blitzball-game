@@ -322,6 +322,28 @@ against the ladder alone.
     `LADDER_RUNS=20 npm run ladder` was added for this: every number above is the 600-fixture
     reading, not the 300 the sweep was done on, because a balance constant should not move on
     one seed family.
+16. **A pool that takes crossing** ✅ (#51). Reported after playing #50: still arriving at goal
+    far too fast. It was not the size, and no size would ever have fixed it. `maxSpeed` scaled
+    with `POOL_RADIUS` *exactly*, and the note above it said so as an achievement — "crossing it
+    still takes the same few seconds". It did: **8.1 seconds at radius 50, 110, 130 and 150
+    alike**. Three enlargements in a day changed nothing about the one thing being complained
+    about, because traversal time was never a function of the pool.
+    `SWIM_SCALE` makes that exponent explicit and sets it to 0.5. Goal to goal goes from 7.4
+    seconds to 12.9. At 1 the pool cannot be made to feel bigger; at 0 a resize would retune the
+    whole game by stealth, which is what the scaling existed to prevent. Half power keeps the
+    guard and drops the trap.
+    **`HALF_SECONDS` 180 → 300 comes with it**, and is FFX's own figure — ours was shortened to
+    keep a demo brisk. Slower swimming leaves a three-minute half with a quarter less football
+    in it: 20.8 shots a match down to 15.6, goals to 1.63. Five minutes puts both back and more,
+    at 26.3 shots and 165 encounters against 101, with goals at 2.59.
+    Measured separately before being shipped together: swim alone is 1.63, swim plus the longer
+    half is 2.59. A gentler 0.65 was also run and rejected — 2.81 goals, and less of what was
+    asked for.
+    Longer matches take luck out, which costs the weakest side. Besaid's points fall by a third
+    while their goals conceded *per minute* slightly improve: with twice the goals in a match,
+    fewer are decided by one. The table order is unchanged.
+    Side effect worth having: `POOL_RADIUS` is now a real lever on traversal time rather than a
+    purely visual one. At half power, doubling the radius makes crossing take about 1.4× as long.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

@@ -25,6 +25,11 @@
  * The camera stand-off in `scene-renderer.ts` is the other half of the change:
  * it scales with this, so enlarging the pool alone walks the camera away from
  * players who have not grown.
+ *
+ * Raising this is now a real lever on how long the pool takes to cross, which it
+ * was not before: swim speed scaled with it exactly, so every size crossed in
+ * the same eight seconds. See `SWIM_SCALE`. At its current half-power, doubling
+ * the radius makes crossing take about 1.4 times as long.
  */
 export const POOL_RADIUS = 150
 
