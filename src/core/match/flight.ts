@@ -248,18 +248,21 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
     applyStatus(keeper, flight.technique.inflicts)
   }
 
-  // What survived the distance. A shot that arrives spent is gathered rather
-  // than saved: the keeper never had to do anything.
-  let power = powerLeft(flight)
-  if (power <= 0) {
-    spill(state, flight, 'The shot drops short')
-    return
-  }
+  // What survived the distance — but never nothing. A shot that has been bled
+  // dry by the journey still arrives as a shot rather than as a dribble the
+  // keeper picks up, so there is always something to save and therefore always
+  // something that might go in. Reported from play: watching the power fall to
+  // zero on the way made shooting feel pointless, because it was.
+  //
+  // It stays a *small* chance, and against a good keeper none at all: this is
+  // the floor of the shot, not of the outcome. Nimrook's catch never rolls
+  // below 3, so a spent shot never beats him. Keepa's rolls as low as 1.
+  const power = Math.max(MINIMUM_ARRIVING_SHOT, powerLeft(flight))
 
   if (keeper) {
-    power -= rollCatch(effectiveStat(keeper, 'ca'), state.rng)
+    const beaten = power - rollCatch(effectiveStat(keeper, 'ca'), state.rng)
 
-    if (power <= 0) {
+    if (beaten <= 0) {
       awardExp(state, keeper, 'save')
       giveBallTo(state, keeper)
       clearAreaAroundKeeper(state, keeper)
@@ -278,6 +281,22 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
   state.ball.vx = 0
   state.ball.vy = 0
 }
+
+/**
+ * The least a shot can arrive with, however far it has travelled.
+ *
+ * Distance saps a shot; it should not erase it. Below this the throw stopped
+ * being a shot at all — it was gathered rather than saved, with no roll and no
+ * chance, and a player watching the number fall could see that shooting from
+ * range was not a long shot but a formality.
+ *
+ * Two is deliberately meagre, and the difference between two and three is not
+ * small: against Keepa a spent shot goes in about one time in a hundred at two,
+ * and closer to one in twelve at three. Three took the league to 4.18 goals a
+ * match with only 7% of fixtures goalless. The floor is meant to make range a
+ * bad idea rather than an impossible one, not a good one.
+ */
+export const MINIMUM_ARRIVING_SHOT = 2
 
 /** How long the goal banner holds before the restart. */
 export const CELEBRATION_SECONDS = 2.2

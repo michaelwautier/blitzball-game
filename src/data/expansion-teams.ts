@@ -113,9 +113,16 @@ export const DJOSE_SPARKS: TeamDef = {
 /**
  * Jecht's own side, out of the Zanarkand that Sin dreamed.
  *
- * The strongest team in the league, and meant to be: somewhere for a squad to
- * still be aiming once it has caught the Psyches. Jecht himself is the best
- * shooter in the game by a distance, and Yunal in goal beats Nimrook.
+ * A rival for the Psyches rather than a wall above them.
+ *
+ * They were built stronger, and it did not work: at fourteen per cent above the
+ * Psyches they went 180-0-0 with twelve goals a match, and even trimmed back
+ * they finished a season unbeaten. This engine turns a modest stat edge into a
+ * total one — see the note in `PLAN.md` — so "clearly the best" and "never
+ * beaten" are very nearly the same setting.
+ *
+ * Levelled with the Psyches instead, so the title is contested rather than
+ * awarded, and beating them is something a season can actually contain.
  */
 export const ZANARKAND_ABES: TeamDef = {
   id: 'abes',
@@ -124,13 +131,13 @@ export const ZANARKAND_ABES: TeamDef = {
   colours: { primary: '#f0f4ff', secondary: '#1d2a4d' },
   roster: [
     //                                              HP  SPD  EN  AT  PA  BL  SH  CA
-    player('yunal', 'Yunal', 'GK', stats(100, 63, 6, 10, 2, 5, 1, 15), growth(69.028, 0, 0.651, 0.302, 0.349, 0.163, 0.233, 0.396)),
-    player('zanar', 'Zanar', 'LD', stats(132, 63, 9, 12, 7, 10, 1, 3), growth(64.468, 0, 0.767, 0.581, 0.93, 0.326, 0.116, 0.233), ['venom-tackle']),
-    player('lesca', 'Lesca', 'RD', stats(105, 63, 6, 10, 14, 10, 1, 1), growth(75.542, 0, 0.581, 0.535, 0.838, 0.373, 0.163, 0.139), ['wither-tackle']),
-    player('kaira', 'Kaira', 'MF', stats(216, 63, 8, 10, 13, 12, 5, 1), growth(69.33, 0, 0.605, 0.489, 0.814, 0.535, 0.349, 0.233), ['venom-pass', 'wither-pass']),
-    player('jecht', 'Jecht', 'LF', stats(195, 63, 14, 6, 9, 12, 12, 1), growth(73.378, 0, 0.651, 0.279, 0.651, 0.465, 0.698, 0.093), ['jecht-shot', 'sphere-shot']),
-    player('vegnal', 'Vegnal', 'RF', stats(195, 63, 14, 3, 9, 13, 10, 1), growth(75.124, 0, 0.512, 0.442, 0.767, 0.512, 0.744, 0.07), ['nap-shot']),
-    player('sunel', 'Sunel', 'MF', stats(147, 63, 9, 9, 9, 9, 6, 1), growth(70.0, 0, 0.55, 0.50, 0.70, 0.45, 0.35, 0.20)),
+    player('yunal', 'Yunal', 'GK', stats(92, 58, 5, 9, 2, 5, 1, 13), growth(69.028, 0, 0.651, 0.302, 0.349, 0.163, 0.233, 0.396)),
+    player('zanar', 'Zanar', 'LD', stats(121, 58, 8, 11, 6, 9, 1, 3), growth(64.468, 0, 0.767, 0.581, 0.93, 0.326, 0.116, 0.233)),
+    player('lesca', 'Lesca', 'RD', stats(96, 58, 5, 9, 13, 9, 1, 1), growth(75.542, 0, 0.581, 0.535, 0.838, 0.373, 0.163, 0.139)),
+    player('kaira', 'Kaira', 'MF', stats(198, 58, 7, 9, 12, 11, 5, 1), growth(69.33, 0, 0.605, 0.489, 0.814, 0.535, 0.349, 0.233), ['venom-pass']),
+    player('jecht', 'Jecht', 'LF', stats(178, 58, 13, 5, 8, 11, 11, 1), growth(73.378, 0, 0.651, 0.279, 0.651, 0.465, 0.698, 0.093), ['jecht-shot']),
+    player('vegnal', 'Vegnal', 'RF', stats(178, 58, 13, 3, 8, 12, 9, 1), growth(75.124, 0, 0.512, 0.442, 0.767, 0.512, 0.744, 0.07)),
+    player('sunel', 'Sunel', 'MF', stats(135, 58, 8, 8, 8, 8, 5, 1), growth(70.0, 0, 0.55, 0.50, 0.70, 0.45, 0.35, 0.20)),
   ],
   lineup: { GK: 'yunal', LD: 'zanar', RD: 'lesca', MF: 'kaira', LF: 'jecht', RF: 'vegnal' },
 }

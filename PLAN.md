@@ -493,16 +493,41 @@ against the ladder alone.
     `isShotWorthTaking` refuses any shot whose power cannot beat the keeper's expected catch, so
     a best shooter of 8 scores essentially nothing and one of 14 scores freely. This is exactly
     **#25**: the Guado's best is 8 and Kilika's is 6. Not "no shooter" loosely — a cliff.
-    **The engine is violently superlinear in stat advantage.** A side at *fourteen per cent*
-    above the Psyches went 180-0-0 with twelve goals a match. Hand-tuning against that does not
-    converge, and four attempts failed before the sides were instead derived by interpolating
-    the real ones — which lands them in range by construction. Worth knowing before anyone tries
-    to place a team by eye again.
+    **Something other than stats decides a league position, and it is not yet known what.** The
+    Abes were built above the Psyches, went 180-0-0, and were trimmed four times. They now sit
+    *below the Psyches on every single stat* — EN 46 v 49, AT 37 v 39, PA 47 v 50, BL 52 v 54,
+    best SH 11 v 13, keeper 13 v 18 — and still win 156 of 180, conceding nine goals against the
+    Psyches' twenty-nine. Ruled out so far: stats (they are worse), techniques (stripping their
+    tackle techniques moved them four points), and `natural` position, which the engine never
+    reads. Unresolved, and worth resolving: whatever it is, it decides league tables.
     The Abes are still unbeaten across a simulated season, at 165-15-0. Reported rather than
     tuned away: they are meant to be the wall at the top, and pulling them down to beatable
     would have meant making them no better than the Psyches, which is not what was asked for.
-    Ladder over all ninety pairings: 2.23 goals a match, and a table running 510 points down to
-    67 across ten distinct tiers.
+    `npm run ladder` now measures Square's six by default, with `LADDER_ALL=1` for all ten.
+    Ninety ordered pairings took a reading from about two minutes to about fifteen, and a
+    balance change takes several readings — so the default has to be the cheap one, or measuring
+    stops happening. It also keeps the evidence made of transcribed numbers rather than invented
+    ones.
+    Ladder over all ten: 2.03 goals a match, a table running 492 points down to 68 across ten
+    distinct tiers.
+24. **A shot is always a shot** ✅ (#60). Reported from play, and only visible because the
+    trajectory readout from 21 put the number on screen: *"the shoot points decrease way too
+    fast, it seems impossible to score"*. It was.
+    A shot arriving with nothing left was **gathered rather than saved** — no roll, no keeper,
+    no chance whatsoever. And the range is short: at this pool size `SHOT_DECAY_PER_UNIT` is
+    0.17 a unit, so the best shooter in the game covers 76 units of a pool 300 wide, a quarter
+    of the pitch, before blockers take their cut.
+    `MINIMUM_ARRIVING_SHOT` gives every shot a floor, so the keeper always has to save it and
+    once in a great while does not. Two, not three: against Keepa that is about one spent shot
+    in a hundred, where three is nearer one in twelve and took the league to 4.18 goals a match
+    with 7% of fixtures goalless.
+    At two the goal rate is unmoved — 2.66 to 2.68 — but goalless fixtures fall from 37% to 32%
+    and **the sides that could not score treble their goals**: the Guado 6 to 20, Kilika 10 to
+    20. Sides with no shooter were not merely unlikely to score, they were arithmetically
+    barred, and that is most of **#25**.
+    The decay rate itself is untouched and is the larger question: a quarter of the pitch is a
+    short range for a shot, and shortening it further is how the goal rate has been controlled
+    all along.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
