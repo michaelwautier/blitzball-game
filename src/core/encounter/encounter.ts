@@ -15,7 +15,7 @@ import type {
   Player,
 } from '../match/types'
 import { USER_TEAM } from '../match/types'
-import { ACTION_HP_COST, rollBounds, rollStat } from './formulas'
+import { ACTION_HP_COST, passRange, rollBounds, rollStat } from './formulas'
 import { findTechnique, techniquesOf, type Technique } from '../../data/techniques'
 import { applyStatus } from '../match/status'
 import { canAfford, effectiveStat, spendHp } from '../match/stats'
@@ -261,6 +261,32 @@ export function blockRange(defenders: readonly EncounterDefender[]): {
   max: number
 } {
   return totalRange(defenders.map((d) => d.block), coverageOf)
+}
+
+/**
+ * How far this carrier's pass can actually reach, past whoever is on them.
+ *
+ * Three numbers because the blocking is rolled: `min` is the distance a pass is
+ * certain to cover even if every defender reads it, `max` the distance it can
+ * cover if none of them lay a hand on it, and `expected` the middle — which is
+ * what the AI judges on, matching how `isShotWorthTaking` treats a shot.
+ *
+ * The menu shows the first two, so choosing a receiver is choosing between
+ * passes that can arrive rather than guessing at a range the game never
+ * mentioned. Out beyond `max` a pass is not a risk, it is a giveaway: it flies
+ * the whole way, arrives with nothing on it, and is fumbled to the opposition.
+ */
+export function passReach(
+  carrier: Player,
+  defenders: readonly EncounterDefender[],
+): { min: number; max: number; expected: number } {
+  const power = effectiveStat(carrier, 'pa')
+  const blocks = blockRange(defenders)
+  return {
+    min: passRange(power - blocks.max),
+    max: passRange(power - blocks.min),
+    expected: passRange(power - (blocks.min + blocks.max) / 2),
+  }
 }
 
 function totalRange(

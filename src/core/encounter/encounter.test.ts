@@ -6,15 +6,19 @@ import {
   blockRange,
   engagingDefenders,
   openEncounter,
+  passReach,
   resolveEncounter,
   tackleRange,
 } from './encounter'
-import { rollBounds } from './formulas'
+import { passDecay, rollBounds } from './formulas'
 import { createMatch, stepMatch } from '../match/state'
+import { effectiveStat } from '../match/stats'
 import { POOL_RADIUS } from '../pitch'
 import { giveBallTo } from '../match/possession'
-import type { MatchState, Player } from '../match/types'
+import type { Encounter, MatchState, Player } from '../match/types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
+import { bestPassTarget } from '../ai/decisions'
+import { attackDirection } from '../match/formation'
 
 const newMatch = (seed = 'enc') => createMatch(BESAID_AUROCHS, LUCA_GOERS, seed)
 
@@ -741,5 +745,106 @@ describe('pass and shoot', () => {
 
     const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
     expect(result.success).toBe(false)
+  })
+})
+
+/**
+ * PA is a range, and both the menu and the AI now ask it the same question.
+ */
+describe('how far a pass can reach', () => {
+  it('shrinks as more of the defence gets in the way', () => {
+    const state = newMatch()
+    const carrier = find(state, 'home:datto')
+    const clear = passReach(carrier, [])
+    const blocked = passReach(carrier, [
+      { id: 'away:doram', attack: 11, block: 6 },
+      { id: 'away:balgerda', attack: 9, block: 8 },
+    ])
+
+    expect(blocked.max).toBeLessThan(clear.max)
+    expect(blocked.min).toBeLessThanOrEqual(blocked.max)
+  })
+
+  it('is unlimited by nothing: an unmarked passer reaches exactly their PA', () => {
+    const state = newMatch()
+    const carrier = find(state, 'home:datto')
+    const reach = passReach(carrier, [])
+
+    // No defenders means no roll, so the whole band collapses to one distance.
+    expect(reach.min).toBeCloseTo(reach.max)
+    expect(reach.expected).toBeCloseTo(reach.max)
+    expect(passDecay(reach.max)).toBeCloseTo(effectiveStat(carrier, 'pa'))
+  })
+
+  it('can be nothing at all when the blocking outweighs the passer', () => {
+    const state = newMatch()
+    const carrier = find(state, 'home:datto')
+    const swamped = passReach(carrier, [{ id: 'away:doram', attack: 11, block: 99 }])
+
+    expect(swamped.min).toBe(0)
+  })
+})
+
+/**
+ * The AI throwing balls that cannot arrive.
+ *
+ * Measured before this was fixed: across three hundred simulated matches, 3402
+ * of the 10592 passes the AI chose were beyond even the best case of the
+ * passer's range. Each one flew its whole distance, arrived spent, and was
+ * fumbled straight to the opposition — a third of every pass in the league.
+ */
+describe('choosing someone the pass can reach', () => {
+  /** Two defenders on the carrier, which is what cuts a good passer's range down. */
+  const held = (carrier: Player): Encounter => ({
+    kind: 'contested',
+    carrierId: carrier.id,
+    defenders: [
+      { id: 'away:doram', attack: 11, block: 5 },
+      { id: 'away:balgerda', attack: 9, block: 5 },
+    ],
+    endurance: 20,
+    thinkTimer: 0,
+    awaitingDefence: false,
+    defence: null,
+  })
+
+  /** Letty on the ball at his own end, with the pitch laid out ahead of him. */
+  function pinnedBack(state: MatchState): { carrier: Player; forward: number } {
+    const carrier = find(state, 'home:letty')
+    const forward = attackDirection(state.teams.home.defending)
+    carrier.x = -forward * POOL_RADIUS * 0.9
+    carrier.y = 0
+    giveBallTo(state, carrier)
+    return { carrier, forward }
+  }
+
+  it('will not pick a teammate beyond the throw', () => {
+    const state = newMatch()
+    const { carrier, forward } = pinnedBack(state)
+
+    // Everyone upfield and out of reach: held by two, Letty's best case is
+    // about 180 units and the far end of the pool is nearly 200 away.
+    for (const mate of state.players.filter((p) => p.team === 'home' && p.id !== carrier.id)) {
+      mate.x = forward * POOL_RADIUS * 0.9
+      mate.y = 0
+    }
+
+    expect(bestPassTarget(state, carrier, held(carrier))).toBeUndefined()
+  })
+
+  it('still finds the one who is within it', () => {
+    const state = newMatch()
+    const { carrier, forward } = pinnedBack(state)
+
+    for (const mate of state.players.filter((p) => p.team === 'home' && p.id !== carrier.id)) {
+      mate.x = forward * POOL_RADIUS * 0.9
+      mate.y = 0
+    }
+    // One teammate drops back into range, ahead of the ball but reachable.
+    const outlet = find(state, 'home:tidus')
+    outlet.x = carrier.x + forward * 40
+    outlet.y = 0
+
+    expect(bestPassTarget(state, carrier, held(carrier))?.id).toBe('home:tidus')
   })
 })

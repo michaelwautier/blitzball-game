@@ -9,6 +9,7 @@ import {
   ENGAGE_RADIUS,
   blockRange,
   defensiveTechniques,
+  passReach,
   tackleRange,
 } from '../encounter/encounter'
 import { techniquesOf } from '../../data/techniques'
@@ -118,7 +119,7 @@ export function chooseEncounterAction(
     return { kind: 'breakthrough', breakPast: encounter.defenders.length }
   }
 
-  const receiver = bestPassTarget(state, carrier)
+  const receiver = bestPassTarget(state, carrier, encounter)
   if (receiver) {
     return (
       clearFirst('pa') ?? {
@@ -189,6 +190,15 @@ const MIN_PASS_ADVANCE = 2
 const COVERED_PENALTY = 8
 
 /**
+ * How much a metre of distance counts against a pass that is already in range.
+ *
+ * A tiebreak between passes that can all arrive, not a range check — that is
+ * `passReach`'s job now. Longer balls are easier to read and leave less in hand
+ * on arrival, so the nearer of two equally useful options wins.
+ */
+const NEARBY_PREFERENCE = 0.25
+
+/**
  * The most useful teammate to find.
  *
  * Marked players are penalised rather than excluded, and the pass must actually
@@ -197,18 +207,31 @@ const COVERED_PENALTY = 8
  * behind the ball, and a side ends up passing backwards for the entire match
  * without ever entering the opposition half.
  */
-export function bestPassTarget(state: MatchState, carrier: Player): Player | undefined {
+export function bestPassTarget(
+  state: MatchState,
+  carrier: Player,
+  encounter?: Encounter,
+): Player | undefined {
   const carrierGoalDistance = distanceToOpposingGoal(state, carrier)
+  // The best case, not the likely one: this rules out passes that *cannot*
+  // arrive, and leaves the gambles as gambles. Measured across 300 matches,
+  // a third of every pass the AI chose — 3402 of 10592 — was beyond even this.
+  const reach = passReach(carrier, encounter?.defenders ?? []).max
 
   let best: Player | undefined
   let bestScore = -Infinity
   let bestAdvance = 0
 
   for (const mate of outfieldTeammates(state, carrier.team, carrier.id)) {
+    const distance = distanceBetween(carrier, mate)
+    // Out of range is not a worse pass, it is a turnover: the ball flies the
+    // whole way, arrives spent, and is fumbled to whoever is nearest. It was
+    // previously a mild preference for nearby, which let a tiring passer keep
+    // picking the teammate they could see rather than the one they could reach.
+    if (distance > reach) continue
+
     const advance = carrierGoalDistance - distanceToOpposingGoal(state, mate)
-    // Long passes decay and are easier to read, so mild preference for nearby.
-    const reach = -distanceBetween(carrier, mate) * 0.25
-    const score = advance + reach - (isCovered(state, mate) ? COVERED_PENALTY : 0)
+    const score = advance - distance * NEARBY_PREFERENCE - (isCovered(state, mate) ? COVERED_PENALTY : 0)
 
     if (score > bestScore) {
       bestScore = score

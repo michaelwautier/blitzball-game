@@ -3,6 +3,7 @@ import {
   allowedActions,
   blockRange,
   defensiveTechniques,
+  passReach,
   tackleRange,
 } from '../core/encounter/encounter'
 import { ACTION_HP_COST } from '../core/encounter/formulas'
@@ -288,7 +289,7 @@ export class EncounterMenu {
       case 'defence':
         return this.defenceRows(state, encounter)
       case 'passTargets':
-        return this.passTargetRows(state, carrier)
+        return this.passTargetRows(state, carrier, encounter)
       case 'breakthrough':
         return this.breakthroughRows(state, encounter)
       case 'passTechnique':
@@ -386,8 +387,9 @@ export class EncounterMenu {
     return rows
   }
 
-  private passTargetRows(state: MatchState, carrier: Player): Row[] {
+  private passTargetRows(state: MatchState, carrier: Player, encounter: Encounter): Row[] {
     const next = this.afterTargetChosen(carrier)
+    const reach = passReach(carrier, encounter.defenders)
 
     // Nearest first. A pass loses power over the distance it travels, so the
     // top of the list is the safest ball rather than the most ambitious one, and
@@ -396,11 +398,16 @@ export class EncounterMenu {
       .sort((a, b) => distanceBetween(carrier, a) - distanceBetween(carrier, b))
       .map((mate) => {
         const covered = isCovered(state, mate)
+        const distance = distanceBetween(carrier, mate)
+        const range = describeReach(distance, reach)
         return {
           label: mate.def.name,
-          detail: `${mate.slot} · ${distanceBetween(carrier, mate).toFixed(0)}m · ${covered ? 'marked' : 'free'}`,
-          tone: covered ? ('risky' as const) : ('safe' as const),
+          detail: `${mate.slot} · ${distance.toFixed(0)}m · ${range.word} · ${covered ? 'marked' : 'free'}`,
+          tone: range.beyond ? ('risky' as const) : covered ? ('risky' as const) : ('safe' as const),
           targetId: mate.id,
+          // Still choosable. Throwing one away is a real decision — clearing
+          // your own half is worth a fumble at the far end — and the row says
+          // plainly what it is.
           effect: next(mate.id),
           enabled: true,
         }
@@ -696,4 +703,21 @@ function outcomeTone(best: number, worst: number): 'good' | 'bad' | 'mixed' {
   if (worst > 0) return 'good'
   if (best <= 0) return 'bad'
   return 'mixed'
+}
+
+/**
+ * Whether a receiver is actually within throwing distance.
+ *
+ * PA is a range, and until now the menu never said so: a name and a distance in
+ * metres are only useful together if you know which distances you can cover.
+ * The three states are the three that matter — certain to arrive, arrives if the
+ * defence does not read it, and cannot arrive at all.
+ */
+function describeReach(
+  distance: number,
+  reach: { min: number; max: number },
+): { word: string; beyond: boolean } {
+  if (distance <= reach.min) return { word: 'in range', beyond: false }
+  if (distance <= reach.max) return { word: 'at the limit', beyond: false }
+  return { word: 'out of range', beyond: true }
 }
