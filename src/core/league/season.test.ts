@@ -266,8 +266,17 @@ describe('replaying a season', () => {
  * worse the longer a career went on.
  */
 describe('the league improving alongside you', () => {
+  /**
+   * Four sides rather than ten.
+   *
+   * These play whole seasons, and a ten-team season is seventy-two simulated
+   * matches at five-minute halves — slow here and slower still on CI, where it
+   * timed out. Nothing being asserted is about how big the league is.
+   */
+  const SMALL = IDS.slice(0, 4)
+
   it('banks what the sides you are not watching earn', () => {
-    const season = createSeason(IDS, 'aurochs', 'levelling')
+    const season = createSeason(SMALL, 'aurochs', 'levelling')
     const squad = new Squad()
 
     simulateRound(season, 1, squad)
@@ -279,19 +288,19 @@ describe('the league improving alongside you', () => {
   })
 
   it('leaves them at a higher level after a full season than before it', () => {
-    const season = createSeason(IDS, 'aurochs', 'a-whole-season')
+    const season = createSeason(SMALL, 'aurochs', 'a-whole-season')
     const squad = new Squad()
 
     simulateRestOfSeason(season, squad)
 
     const levelled = squad.all().filter((career) => career.level > 1)
     expect(levelled.length, 'nobody in the league levelled up all season').toBeGreaterThan(0)
-  })
+  }, SIMULATED)
 
   it('keeps one career per player however many fixtures they play', () => {
     // Careers are keyed by team and player, not by which end of a fixture they
     // happened to line up at, so a player carries one record all season.
-    const season = createSeason(IDS, 'aurochs', 'one-career')
+    const season = createSeason(SMALL, 'aurochs', 'one-career')
     const squad = new Squad()
 
     simulateRestOfSeason(season, squad)
@@ -299,12 +308,12 @@ describe('the league improving alongside you', () => {
     const ids = squad.all().map((career) => career.playerId)
     expect(new Set(ids).size).toBe(ids.length)
     for (const id of ids) expect(id).not.toContain('home:')
-  })
+  }, SIMULATED)
 
   it('plays the unwatched fixtures at the levels those sides have reached', () => {
     // Not just banking: the next round has to be played by the improved side,
     // or a league that levels up plays exactly like one that does not.
-    const season = createSeason(IDS, 'aurochs', 'plays-levelled')
+    const season = createSeason(SMALL, 'aurochs', 'plays-levelled')
     const squad = new Squad()
     simulateRestOfSeason(season, squad)
 
@@ -318,5 +327,5 @@ describe('the league improving alongside you', () => {
 
     // Same fixture, same seed; the only difference is who is playing it.
     expect(withCareers).not.toEqual(without)
-  })
+  }, SIMULATED)
 })
