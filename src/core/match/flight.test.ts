@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMatch, stepMatch } from './state'
 import { giveBallTo } from './possession'
+import { keeperFor } from './queries'
 import { startPass, startShot } from './flight'
 import type { MatchState, Player } from './types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
@@ -144,7 +145,7 @@ describe('a throw that arrives spent', () => {
 })
 
 describe('a shot that arrives spent', () => {
-  it('is gathered rather than saved, the keeper having done nothing', () => {
+  it('still has to be saved, however little is left of it', () => {
     const state = newMatch('short-shot')
     const shooter = find(state, 'home:wakka')
     shooter.x = 0
@@ -161,10 +162,14 @@ describe('a shot that arrives spent', () => {
       if (state.announcement) landed = state.announcement
     }
 
-    expect(landed, landed).not.toContain('saves')
+    // It used to be gathered rather than saved: a spent shot arrived with
+    // nothing, the keeper never rolled, and the chance of a goal was exactly
+    // zero. Watching that number fall on screen made shooting from range look
+    // pointless, and it was. It arrives with `MINIMUM_ARRIVING_SHOT` now, so the
+    // keeper has to make the save — and once in a great while does not.
+    expect(landed, landed).toContain('saves')
     expect(state.teams.home.score).toBe(0)
-    const carrier = state.players.find((p) => p.id === state.ball.carrier)
-    expect(carrier?.team).toBe('away')
+    expect(state.ball.carrier).toBe(keeperFor(state, 'away')?.id)
   })
 })
 

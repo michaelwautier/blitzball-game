@@ -1056,3 +1056,63 @@ describe('tackle techniques', () => {
     expect(encounter.defenders[0]!.attack).toBe(expected)
   })
 })
+
+/**
+ * A technique can halve a defence. It cannot delete one.
+ *
+ * FFX's Jecht Shot "knocks away two players", which is a powerful advantage
+ * there because a defence can hold more than two. `MAX_ENGAGED` is two here, so
+ * ignoring two ignored the whole contest, unconditionally, every time.
+ *
+ * Measured head to head over forty-eight fixtures: the side built around Jecht
+ * scored fifty goals with the technique and none at all without it. Giving him a
+ * *better* shooter's stats instead changed nothing, because the shot was never
+ * being blocked in the first place. One player holding this outweighed every
+ * stat on the team put together.
+ */
+describe('a technique that brushes blockers aside', () => {
+  /** A carrier who knows Jecht Shot, held by `count` defenders. */
+  function shooting(seed: string, count: number) {
+    const state = newMatch(seed)
+    const carrier = setUpEncounter(state, 'home:tidus', count)
+    const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
+    encounter.endurance = 200
+    state.endurance = 200
+    return { state, encounter }
+  }
+
+  const shoot = (state: MatchState, encounter: Encounter, techniqueId: string | null) =>
+    resolveEncounter(state, encounter, { kind: 'shoot', techniqueId }).summary
+
+  it('still faces somebody when it would otherwise clear them all', () => {
+    const { state, encounter } = shooting('clears-all', 2)
+    expect(findTechnique('jecht-shot').ignoresBlockers).toBe(2)
+    expect(encounter.defenders).toHaveLength(2)
+
+    // A subtraction in the arithmetic is a blocker who got a hand to it. There
+    // were none at all before: two ignored, two engaged, nothing left to beat.
+    expect(shoot(state, encounter, 'jecht-shot')).toMatch(/−/)
+  })
+
+  it('leaves exactly one contesting rather than none', () => {
+    const { state, encounter } = shooting('exactly-one', 2)
+    const summary = shoot(state, encounter, 'jecht-shot')
+
+    // Two engaged, one brushed aside, one left: a single subtraction.
+    expect(summary.match(/−/g)).toHaveLength(1)
+  })
+
+  it('brushes nobody aside when only one is on the carrier', () => {
+    const { state, encounter } = shooting('only-one', 1)
+    expect(encounter.defenders).toHaveLength(1)
+
+    expect(shoot(state, encounter, 'jecht-shot').match(/−/g)).toHaveLength(1)
+  })
+
+  it('leaves a technique that ignores nobody facing everybody', () => {
+    const { state, encounter } = shooting('ignores-none', 2)
+    expect(findTechnique('venom-shot').ignoresBlockers).toBe(0)
+
+    expect(shoot(state, encounter, 'venom-shot').match(/−/g)).toHaveLength(2)
+  })
+})

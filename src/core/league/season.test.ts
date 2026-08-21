@@ -13,11 +13,20 @@ import {
   totalRounds,
 } from './season'
 import { involves } from './fixtures'
+import type { Season } from './season'
 import { TEAMS, findTeam } from '../../data/teams'
 import { Squad } from '../progression/squad'
 import { simulateMatch } from './simulate'
 
 const IDS = TEAMS.map((team) => team.id)
+
+/**
+ * Fixtures in a round that are not the user's, derived rather than counted by
+ * hand — so adding a side to the league does not quietly turn the assertions
+ * below into assertions about nothing.
+ */
+const othersPerRound = (season: Season, round = 1): number =>
+  season.fixtures.filter((f) => f.round === round && !involves(f, USER)).length
 const USER = 'aurochs'
 const newSeason = (seed = 'season') => createSeason(IDS, USER, seed)
 
@@ -119,8 +128,11 @@ describe('the rest of the round', () => {
     const season = newSeason()
     const played = simulateRound(season, 1)
 
-    // Six sides, three fixtures a round, one of them the user's.
-    expect(played).toBe(2)
+    // Every fixture of the round bar the user's own. Read off the fixture list
+    // rather than written down, so adding a side to the league does not quietly
+    // turn this into an assertion about nothing.
+    expect(played).toBe(othersPerRound(season))
+    expect(played).toBeGreaterThan(0)
     for (const fixture of season.fixtures.filter((f) => f.round === 1)) {
       expect(isPlayed(season, fixture)).toBe(!involves(fixture, USER))
     }
@@ -134,9 +146,11 @@ describe('the rest of the round', () => {
 
   it('does not replay a round it has already resolved', () => {
     const season = newSeason()
-    expect(simulateRound(season, 1)).toBe(2)
+    const others = othersPerRound(season)
+
+    expect(simulateRound(season, 1)).toBe(others)
     expect(simulateRound(season, 1)).toBe(0)
-    expect(season.results).toHaveLength(2)
+    expect(season.results).toHaveLength(others)
   }, SIMULATED)
 
   it('holds the round until the user has played theirs', () => {
@@ -220,13 +234,15 @@ describe('replaying a season', () => {
       expect(other, `${result.fixture.home} v ${result.fixture.away} went missing`).toBeDefined()
       expect([other!.home, other!.away]).toEqual([result.home, result.away])
     }
-    expect(forwards.results.length).toBe(4)
+    // Two rounds' worth, whatever a round happens to hold.
+    expect(forwards.results.length).toBe(othersPerRound(forwards, 1) + othersPerRound(forwards, 3))
+    expect(forwards.results.length).toBeGreaterThan(0)
   }, SIMULATED)
 
   it('gives different seasons different results', () => {
     const line = (seed: string) => {
       const season = newSeason(seed)
-      // Three rounds is six simulated fixtures — plenty to diverge on.
+      // Three rounds of simulated fixtures — plenty to diverge on.
       for (let round = 1; round <= 3; round++) simulateRound(season, round)
       return season.results.map((r) => `${r.home}-${r.away}`).join(',')
     }
@@ -250,8 +266,17 @@ describe('replaying a season', () => {
  * worse the longer a career went on.
  */
 describe('the league improving alongside you', () => {
+  /**
+   * Four sides rather than ten.
+   *
+   * These play whole seasons, and a ten-team season is seventy-two simulated
+   * matches at five-minute halves — slow here and slower still on CI, where it
+   * timed out. Nothing being asserted is about how big the league is.
+   */
+  const SMALL = IDS.slice(0, 4)
+
   it('banks what the sides you are not watching earn', () => {
-    const season = createSeason(IDS, 'aurochs', 'levelling')
+    const season = createSeason(SMALL, 'aurochs', 'levelling')
     const squad = new Squad()
 
     simulateRound(season, 1, squad)
@@ -263,19 +288,19 @@ describe('the league improving alongside you', () => {
   })
 
   it('leaves them at a higher level after a full season than before it', () => {
-    const season = createSeason(IDS, 'aurochs', 'a-whole-season')
+    const season = createSeason(SMALL, 'aurochs', 'a-whole-season')
     const squad = new Squad()
 
     simulateRestOfSeason(season, squad)
 
     const levelled = squad.all().filter((career) => career.level > 1)
     expect(levelled.length, 'nobody in the league levelled up all season').toBeGreaterThan(0)
-  })
+  }, SIMULATED)
 
   it('keeps one career per player however many fixtures they play', () => {
     // Careers are keyed by team and player, not by which end of a fixture they
     // happened to line up at, so a player carries one record all season.
-    const season = createSeason(IDS, 'aurochs', 'one-career')
+    const season = createSeason(SMALL, 'aurochs', 'one-career')
     const squad = new Squad()
 
     simulateRestOfSeason(season, squad)
@@ -283,12 +308,12 @@ describe('the league improving alongside you', () => {
     const ids = squad.all().map((career) => career.playerId)
     expect(new Set(ids).size).toBe(ids.length)
     for (const id of ids) expect(id).not.toContain('home:')
-  })
+  }, SIMULATED)
 
   it('plays the unwatched fixtures at the levels those sides have reached', () => {
     // Not just banking: the next round has to be played by the improved side,
     // or a league that levels up plays exactly like one that does not.
-    const season = createSeason(IDS, 'aurochs', 'plays-levelled')
+    const season = createSeason(SMALL, 'aurochs', 'plays-levelled')
     const squad = new Squad()
     simulateRestOfSeason(season, squad)
 
@@ -302,5 +327,5 @@ describe('the league improving alongside you', () => {
 
     // Same fixture, same seed; the only difference is who is playing it.
     expect(withCareers).not.toEqual(without)
-  })
+  }, SIMULATED)
 })

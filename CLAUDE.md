@@ -11,6 +11,14 @@ later. Before opening a PR, check whether it contradicts anything in there.
 
 A plan that disagrees with the code is worse than no plan.
 
+## Invented data stays out of the transcription
+
+`data/teams.ts` is a transcription of FFX's published per-level tables, and the ladder is only
+evidence about FFX's balance for as long as the numbers going into it are Square's. The four
+sides that are ours live in `data/expansion-teams.ts`, and `CANON_TEAMS` is the original six on
+their own. Keep new invented data on that side of the line, so any measurement can be traced
+back to which kind of number produced it.
+
 ## Balance is measured, not guessed
 
 Every constant that affects play lives in `core/encounter/formulas.ts` or is exported and

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_RUNS, formatLadder, runLadder, type LadderReport } from './ladder'
-import { BESAID_AUROCHS, LUCA_GOERS, TEAMS } from '../../data/teams'
+import { BESAID_AUROCHS, CANON_TEAMS, LUCA_GOERS, TEAMS } from '../../data/teams'
 
 /**
  * Vitest provides this; the project has no Node types and does not want them for
@@ -105,9 +105,27 @@ describe.skipIf(!process.env.LADDER)('the full ladder', () => {
   // one before a balance constant is moved on the strength of it.
   const runs = Number(process.env.LADDER_RUNS ?? DEFAULT_RUNS)
 
+  /**
+   * Square's six by default; `LADDER_ALL=1` for the whole ten-team league.
+   *
+   * Two reasons, and the second matters more. Ten teams is ninety ordered
+   * pairings against thirty, so a reading went from about two minutes to about
+   * fifteen — and a balance change takes several readings, so the default has to
+   * be the cheap one or measuring stops happening.
+   *
+   * And every balance conclusion in `PLAN.md` rests on the six transcribed
+   * sides. Keeping the default there keeps the evidence made of Square's numbers
+   * rather than of ours; the invented four are for checking the league is
+   * playable, not for deciding what a constant should be.
+   */
+  const teams = process.env.LADDER_ALL ? TEAMS : CANON_TEAMS
+
   it('plays the whole league', () => {
-    const report: LadderReport = runLadder(runs, TEAMS)
-    process.stderr.write(`\n${formatLadder(report)}\n`)
-    expect(report.matches).toBe(TEAMS.length * (TEAMS.length - 1) * runs)
-  }, 1_800_000)
+    const report: LadderReport = runLadder(runs, teams)
+    process.stderr.write(
+      `\n${teams.length} teams${process.env.LADDER_ALL ? '' : ' (LADDER_ALL=1 for all ten)'}\n` +
+      `${formatLadder(report)}\n`,
+    )
+    expect(report.matches).toBe(teams.length * (teams.length - 1) * runs)
+  }, 3_600_000)
 })

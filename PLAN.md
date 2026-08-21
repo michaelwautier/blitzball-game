@@ -477,6 +477,68 @@ against the ladder alone.
     almost entirely** (62 goals in 200 matches down to 19): every technique they own is a pass
     or a tackle, so the +3s do nothing for their shooting while the decay tune costs them.
     Both halves of **#25** move again, in opposite directions again.
+23. **A league with a bottom as well as a top** ✅ (#60). Four invented sides, taking the league
+    to ten: the Mi'ihen Runners, Moonflow Lilies, Djose Sparks and Zanarkand Abes. Names from
+    FFX — the Abes are Jecht's own team, and the Mi'ihen squad is the Crusaders and Chocobo
+    Knights off the Highroad, who have no business playing blitzball and are correspondingly
+    terrible at it.
+    **They live in `data/expansion-teams.ts`, not `teams.ts`.** That file is a transcription and
+    has to stay one, or the ladder stops being evidence about FFX's balance and becomes evidence
+    about our guesses. `CANON_TEAMS` is Square's six on their own.
+    Besaid finish eighth of ten, which is the point: they are canonically the worst side in
+    Spira and the arc is that you make them good, but with six fixed opponents there was nowhere
+    to climb *from*.
+    Two things were learned by measuring, and both are worth more than the teams.
+    **Scoring tracks a side's single best SH, not its squad total, and the threshold is sharp.**
+    `isShotWorthTaking` refuses any shot whose power cannot beat the keeper's expected catch, so
+    a best shooter of 8 scores essentially nothing and one of 14 scores freely. This is exactly
+    **#25**: the Guado's best is 8 and Kilika's is 6. Not "no shooter" loosely — a cliff.
+    **One technique was worth more than a whole team's stats.** The Abes were built above the
+    Psyches, went 180-0-0, and were trimmed four times without budging — until they sat *below
+    the Psyches on every single stat* and still won 156 of 180.
+    Found by swapping the Psyches' players into the Abes one slot at a time: replacing the left
+    forward took them from 24 wins to none, and scored nothing at all. That slot is Jecht — and
+    the man replacing him is the better shooter on paper, SH 13 against 11.
+    It was **`ignoresBlockers: 2` against a `MAX_ENGAGED` of 2**. FFX's Jecht Shot "knocks away
+    two players", which is a strong advantage there because a defence can hold more than two;
+    here it ignored the entire contest, unconditionally, every time. Over forty-eight head to
+    head fixtures the Abes scored 50 goals with it and **0 without it**, and giving Jecht a
+    better shooter's stats instead changed nothing, because the shot was never being blocked.
+    A throw now always faces somebody: `blockersIgnored` caps the effect at one short of the
+    engaged count, written against `MAX_ENGAGED` rather than as a smaller number on the
+    technique so it stays true if that limit moves. The Abes drop to 351 and third, in a real
+    pack with Djose on 399 and the Psyches on 398 — the contested title that was asked for.
+    The Abes are still unbeaten across a simulated season, at 165-15-0. Reported rather than
+    tuned away: they are meant to be the wall at the top, and pulling them down to beatable
+    would have meant making them no better than the Psyches, which is not what was asked for.
+    `npm run ladder` now measures Square's six by default, with `LADDER_ALL=1` for all ten.
+    Ninety ordered pairings took a reading from about two minutes to about fifteen, and a
+    balance change takes several readings — so the default has to be the cheap one, or measuring
+    stops happening. It also keeps the evidence made of transcribed numbers rather than invented
+    ones.
+    Ladder over all ten: 1.74 goals a match, a table running 399 points down to 67.
+    **It costs Besaid**, whose scoring was very largely Tidus and the same technique: 126 goals
+    down to 49, and last place. Taken deliberately rather than tuned around, because the two
+    are one problem — bypassing the blockers was the only way anyone had of beating a good
+    keeper, which is the shot-decay question in disguise. See the note under *Balance*.
+24. **A shot is always a shot** ✅ (#60). Reported from play, and only visible because the
+    trajectory readout from 21 put the number on screen: *"the shoot points decrease way too
+    fast, it seems impossible to score"*. It was.
+    A shot arriving with nothing left was **gathered rather than saved** — no roll, no keeper,
+    no chance whatsoever. And the range is short: at this pool size `SHOT_DECAY_PER_UNIT` is
+    0.17 a unit, so the best shooter in the game covers 76 units of a pool 300 wide, a quarter
+    of the pitch, before blockers take their cut.
+    `MINIMUM_ARRIVING_SHOT` gives every shot a floor, so the keeper always has to save it and
+    once in a great while does not. Two, not three: against Keepa that is about one spent shot
+    in a hundred, where three is nearer one in twelve and took the league to 4.18 goals a match
+    with 7% of fixtures goalless.
+    At two the goal rate is unmoved — 2.66 to 2.68 — but goalless fixtures fall from 37% to 32%
+    and **the sides that could not score treble their goals**: the Guado 6 to 20, Kilika 10 to
+    20. Sides with no shooter were not merely unlikely to score, they were arithmetically
+    barred, and that is most of **#25**.
+    The decay rate itself is untouched and is the larger question: a quarter of the pitch is a
+    short range for a shot, and shortening it further is how the goal rate has been controlled
+    all along.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
@@ -539,6 +601,14 @@ Holding every player still while the ball is in the air (#39) cost about a fifth
 and reordered the table, which is a reminder that a rule taken purely for fidelity can be a
 balance change in disguise. It stands because the original behaves that way; whether to wind
 scoring back up is a separate decision.
+
+**Shooting range is the open question.** At the current pool `SHOT_DECAY_PER_UNIT` is 0.17 a
+unit, so the best shooter in the game covers 76 units of a pool 300 wide — a quarter of the
+pitch, before blockers take their cut. That is why `ignoresBlockers` mattered so much: bypassing
+the defence was the only way anyone had of arriving with enough to beat a good keeper, and with
+that closed off the Psyches conceded nothing at all in a six-team season. Raising the range
+lifts scoring for everyone, Besaid included, and is the next balance change to make. Its own PR:
+it moves the number every other conclusion here was measured against.
 
 The most sensitive numbers, in order: `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT`, and the
 blocker coverage weights. Small moves in any of them swing the whole board — change one at a
