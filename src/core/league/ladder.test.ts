@@ -60,11 +60,18 @@ describe('the ladder table', () => {
     }
   })
 
-  it('reads the same twice, so two runs differ only by what changed', () => {
-    // The whole method rests on this. A ladder that wandered between runs could
-    // not tell a real effect from noise.
-    expect(runLadder(2, twoTeams)).toEqual(runLadder(2, twoTeams))
-  })
+  it(
+    'reads the same twice, so two runs differ only by what changed',
+    () => {
+      // The whole method rests on this. A ladder that wandered between runs
+      // could not tell a real effect from noise.
+      expect(runLadder(2, twoTeams)).toEqual(report)
+    },
+    // This one actually plays matches inside the test rather than sharing the
+    // table above, and four of them is more than the default five seconds
+    // allows on a cold CI runner.
+    30_000,
+  )
 
   it('says nothing rather than dividing by nothing when there is no league', () => {
     const empty = runLadder(2, [BESAID_AUROCHS])
