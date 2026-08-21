@@ -1,4 +1,6 @@
-import type { PlayerDef, PlayerStats, TeamDef } from './types'
+import type { PlayerDef, TeamDef } from './types'
+import { EXPANSION_TEAMS } from './expansion-teams'
+import { growth, player, stats } from './build'
 
 /**
  * Team and player data, taken from FFX's own tables.
@@ -21,37 +23,6 @@ import type { PlayerDef, PlayerStats, TeamDef } from './types'
  * deliberately left out until there is something to learn them with.
  */
 
-const stats = (
-  hp: number,
-  sp: number,
-  en: number,
-  at: number,
-  pa: number,
-  bl: number,
-  sh: number,
-  ca: number,
-): PlayerStats => ({ hp, sp, en, at, pa, bl, sh, ca })
-
-/** Stat points gained per level, in the same order as `stats`. */
-const growth = (
-  hp: number,
-  sp: number,
-  en: number,
-  at: number,
-  pa: number,
-  bl: number,
-  sh: number,
-  ca: number,
-): PlayerStats => ({ hp, sp, en, at, pa, bl, sh, ca })
-
-const player = (
-  id: string,
-  name: string,
-  natural: PlayerDef['natural'],
-  s: PlayerStats,
-  g: PlayerStats,
-  techniques: readonly string[] = [],
-): PlayerDef => ({ id, name, natural, stats: s, growth: g, techniques })
 
 export const BESAID_AUROCHS: TeamDef = {
   id: 'aurochs',
@@ -156,7 +127,8 @@ export const KILIKA_BEASTS: TeamDef = {
   lineup: { GK: 'nizarut', LD: 'deim', RD: 'vuroja', MF: 'kulukan', LF: 'larbeight', RF: 'isken' },
 }
 
-export const TEAMS: readonly TeamDef[] = [
+/** The six sides that are actually in Final Fantasy X. */
+export const CANON_TEAMS: readonly TeamDef[] = [
   BESAID_AUROCHS,
   LUCA_GOERS,
   RONSO_FANGS,
@@ -164,6 +136,16 @@ export const TEAMS: readonly TeamDef[] = [
   AL_BHED_PSYCHES,
   KILIKA_BEASTS,
 ]
+
+/**
+ * Everyone who plays, Square's six and our four.
+ *
+ * The invented sides live in `expansion-teams.ts` and are imported here rather
+ * than written here, so this file stays what its header says it is: a
+ * transcription. `CANON_TEAMS` is the six on their own, for anything that needs
+ * to reason about the original league specifically.
+ */
+export const TEAMS: readonly TeamDef[] = [...CANON_TEAMS, ...EXPANSION_TEAMS]
 
 export function findTeam(teamId: string): TeamDef {
   const found = TEAMS.find((t) => t.id === teamId)

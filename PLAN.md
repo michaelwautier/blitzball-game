@@ -477,6 +477,32 @@ against the ladder alone.
     almost entirely** (62 goals in 200 matches down to 19): every technique they own is a pass
     or a tackle, so the +3s do nothing for their shooting while the decay tune costs them.
     Both halves of **#25** move again, in opposite directions again.
+23. **A league with a bottom as well as a top** ✅ (#60). Four invented sides, taking the league
+    to ten: the Mi'ihen Runners, Moonflow Lilies, Djose Sparks and Zanarkand Abes. Names from
+    FFX — the Abes are Jecht's own team, and the Mi'ihen squad is the Crusaders and Chocobo
+    Knights off the Highroad, who have no business playing blitzball and are correspondingly
+    terrible at it.
+    **They live in `data/expansion-teams.ts`, not `teams.ts`.** That file is a transcription and
+    has to stay one, or the ladder stops being evidence about FFX's balance and becomes evidence
+    about our guesses. `CANON_TEAMS` is Square's six on their own.
+    Besaid finish eighth of ten, which is the point: they are canonically the worst side in
+    Spira and the arc is that you make them good, but with six fixed opponents there was nowhere
+    to climb *from*.
+    Two things were learned by measuring, and both are worth more than the teams.
+    **Scoring tracks a side's single best SH, not its squad total, and the threshold is sharp.**
+    `isShotWorthTaking` refuses any shot whose power cannot beat the keeper's expected catch, so
+    a best shooter of 8 scores essentially nothing and one of 14 scores freely. This is exactly
+    **#25**: the Guado's best is 8 and Kilika's is 6. Not "no shooter" loosely — a cliff.
+    **The engine is violently superlinear in stat advantage.** A side at *fourteen per cent*
+    above the Psyches went 180-0-0 with twelve goals a match. Hand-tuning against that does not
+    converge, and four attempts failed before the sides were instead derived by interpolating
+    the real ones — which lands them in range by construction. Worth knowing before anyone tries
+    to place a team by eye again.
+    The Abes are still unbeaten across a simulated season, at 165-15-0. Reported rather than
+    tuned away: they are meant to be the wall at the top, and pulling them down to beatable
+    would have meant making them no better than the Psyches, which is not what was asked for.
+    Ladder over all ninety pairings: 2.23 goals a match, and a table running 510 points down to
+    67 across ten distinct tiers.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

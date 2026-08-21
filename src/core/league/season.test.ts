@@ -13,11 +13,20 @@ import {
   totalRounds,
 } from './season'
 import { involves } from './fixtures'
+import type { Season } from './season'
 import { TEAMS, findTeam } from '../../data/teams'
 import { Squad } from '../progression/squad'
 import { simulateMatch } from './simulate'
 
 const IDS = TEAMS.map((team) => team.id)
+
+/**
+ * Fixtures in a round that are not the user's, derived rather than counted by
+ * hand — so adding a side to the league does not quietly turn the assertions
+ * below into assertions about nothing.
+ */
+const othersPerRound = (season: Season, round = 1): number =>
+  season.fixtures.filter((f) => f.round === round && !involves(f, USER)).length
 const USER = 'aurochs'
 const newSeason = (seed = 'season') => createSeason(IDS, USER, seed)
 
@@ -119,8 +128,11 @@ describe('the rest of the round', () => {
     const season = newSeason()
     const played = simulateRound(season, 1)
 
-    // Six sides, three fixtures a round, one of them the user's.
-    expect(played).toBe(2)
+    // Every fixture of the round bar the user's own. Read off the fixture list
+    // rather than written down, so adding a side to the league does not quietly
+    // turn this into an assertion about nothing.
+    expect(played).toBe(othersPerRound(season))
+    expect(played).toBeGreaterThan(0)
     for (const fixture of season.fixtures.filter((f) => f.round === 1)) {
       expect(isPlayed(season, fixture)).toBe(!involves(fixture, USER))
     }
@@ -134,9 +146,11 @@ describe('the rest of the round', () => {
 
   it('does not replay a round it has already resolved', () => {
     const season = newSeason()
-    expect(simulateRound(season, 1)).toBe(2)
+    const others = othersPerRound(season)
+
+    expect(simulateRound(season, 1)).toBe(others)
     expect(simulateRound(season, 1)).toBe(0)
-    expect(season.results).toHaveLength(2)
+    expect(season.results).toHaveLength(others)
   }, SIMULATED)
 
   it('holds the round until the user has played theirs', () => {
@@ -220,13 +234,15 @@ describe('replaying a season', () => {
       expect(other, `${result.fixture.home} v ${result.fixture.away} went missing`).toBeDefined()
       expect([other!.home, other!.away]).toEqual([result.home, result.away])
     }
-    expect(forwards.results.length).toBe(4)
+    // Two rounds' worth, whatever a round happens to hold.
+    expect(forwards.results.length).toBe(othersPerRound(forwards, 1) + othersPerRound(forwards, 3))
+    expect(forwards.results.length).toBeGreaterThan(0)
   }, SIMULATED)
 
   it('gives different seasons different results', () => {
     const line = (seed: string) => {
       const season = newSeason(seed)
-      // Three rounds is six simulated fixtures — plenty to diverge on.
+      // Three rounds of simulated fixtures — plenty to diverge on.
       for (let round = 1; round <= 3; round++) simulateRound(season, round)
       return season.results.map((r) => `${r.home}-${r.away}`).join(',')
     }

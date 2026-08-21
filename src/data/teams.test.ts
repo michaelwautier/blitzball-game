@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TEAMS, findPlayer, findTeam } from './teams'
+import { CANON_TEAMS, TEAMS, findPlayer, findTeam } from './teams'
+import { EXPANSION_TEAMS } from './expansion-teams'
 import { findTechnique } from './techniques'
 import { POSITION_KEYS, type PlayerStats } from './types'
 
@@ -74,8 +75,19 @@ describe('team data', () => {
 })
 
 describe('the league of teams', () => {
-  it('fields six sides', () => {
-    expect(TEAMS).toHaveLength(6)
+  it('fields Square\'s six, and ours on top', () => {
+    // Stated as a relationship rather than a count, so adding a side is a
+    // deliberate act rather than a number to bump. The six are the league in
+    // FFX; the rest are ours and live in their own file.
+    expect(CANON_TEAMS).toHaveLength(6)
+    expect(TEAMS).toHaveLength(CANON_TEAMS.length + EXPANSION_TEAMS.length)
+    for (const team of CANON_TEAMS) expect(TEAMS).toContain(team)
+  })
+
+  it('keeps the invented sides out of the transcribed ones', () => {
+    // The whole reason the two files are separate: a measurement has to be
+    // traceable back to whether it came from Square's numbers or ours.
+    for (const team of EXPANSION_TEAMS) expect(CANON_TEAMS).not.toContain(team)
   })
 
   it('keeps ids, names and abbreviations unique, so results can be told apart', () => {
