@@ -8,7 +8,7 @@ import {
   type Side,
 } from '../core/pitch'
 import { PLAYER_RADIUS } from '../core/match/movement'
-import { edgeMarker, type EdgeMarker } from './off-screen'
+import { edgeMarker, viewportPoint, type EdgeMarker } from './off-screen'
 import { statusLabels } from '../core/match/status'
 import { isExhausted } from '../core/match/stats'
 import { carrierOf, opponentOf, playerById } from '../core/match/queries'
@@ -124,7 +124,7 @@ export class SceneRenderer {
   private readonly lookGoal = new THREE.Vector3()
   private started = false
 
-  private marker: EdgeMarker | null = null
+  private marker: BallView | null = null
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -185,23 +185,31 @@ export class SceneRenderer {
   }
 
   /**
-   * Where the ball is, for anything drawn on top of the scene — or null while it
-   * is in view and needs no help.
+   * Where the ball is on screen, for anything drawn on top of the scene.
+   *
+   * `angle` is set only when it had to be pinned to the edge of the frame, which
+   * is also what says it is out of sight: in view it is a place to put a label,
+   * out of view it is a direction to point.
    *
    * Read after `draw`, since it is the camera's own answer for the frame that
    * was just rendered rather than a separate guess at where things ended up.
    */
-  ballMarker(): EdgeMarker | null {
+  ballMarker(): BallView | null {
     return this.marker
   }
 
-  private markBall(): EdgeMarker | null {
+  private markBall(): BallView | null {
     // Camera space first, purely to ask which side of the lens it is on: a
     // projection alone cannot tell "far in front" from "behind", having mirrored
     // the second through the origin.
     const seen = this.ball.position.clone().applyMatrix4(this.camera.matrixWorldInverse)
     const projected = this.ball.position.clone().project(this.camera)
-    return edgeMarker(projected.x, projected.y, seen.z > 0)
+    const behind = seen.z > 0
+
+    const edge = edgeMarker(projected.x, projected.y, behind)
+    if (edge) return { ...edge, offScreen: true }
+
+    return { ...viewportPoint(projected.x, projected.y), angle: 0, offScreen: false }
   }
 
   dispose(): void {
@@ -605,6 +613,11 @@ function roundedTriangle(radius: number, corner: number): THREE.CurvePath<THREE.
  * the event, and staying on the player who let go of it means watching the
  * least interesting thing in the pool. Otherwise whoever the user is steering.
  */
+/** Where the ball is on screen, and whether it had to be pinned to the edge. */
+export interface BallView extends EdgeMarker {
+  offScreen: boolean
+}
+
 export function focusPoint(state: MatchState, focusId: string | null, alpha: number): Vec3 | null {
   const previewed = focusId ? playerById(state, focusId) : undefined
   if (previewed) return interpolateToScene(previewed, previewed, 1)
