@@ -14,10 +14,21 @@ A plan that disagrees with the code is worse than no plan.
 ## Balance is measured, not guessed
 
 Every constant that affects play lives in `core/encounter/formulas.ts` or is exported and
-documented where it is used. `core/league/simulate.ts` plays a match headlessly with the real
-engine, so a change can be tested across all thirty league pairings before it is believed.
+documented where it is used.
+
+**Run `npm run ladder` before and after any change that could affect play.** It plays all
+thirty league pairings at both ends, ten times each, with the real engine and the real AI, and
+prints a table plus the goal, goalless, encounter, shot and break rates. Quote both readings in
+the PR — a measurement nobody can compare against is not a measurement. It is skipped by
+`npm test`, so it costs CI nothing and has to be asked for.
+
 Change one constant at a time — `SHOOTING_STANDOFF`, `SHOT_DECAY_PER_UNIT` and the blocker
 coverage weights each swing the whole board.
+
+Measure the premise too, not just the result. Three of the changes that mattered most were
+justified by counting what the old code actually did first — a third of the AI's passes could
+not physically arrive — and one proposed fix was thrown out because the ladder said it made
+things worse.
 
 ## The core stays pure
 

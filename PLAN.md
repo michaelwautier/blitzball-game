@@ -309,8 +309,15 @@ No order chosen yet. The candidates, roughly by size:
 ## Balance
 
 Balance is measured, not guessed. `core/league/simulate.ts` plays a match headlessly with the
-real engine, and a scratch ladder over all thirty pairings is the instrument used whenever a
-formula constant moves. Before #24 that ladder read:
+real engine, and `core/league/ladder.ts` runs it over all thirty pairings at both ends — the
+instrument used whenever a formula constant moves. `npm run ladder` prints the table; it is
+skipped by `npm test`, being an instrument rather than an assertion.
+
+It lives in the repository rather than being rebuilt from memory each time, which is how it was
+used for its first dozen readings. A measurement is only worth something if the next one is
+taken the same way, and three of these were rebuilt by hand before that became obvious.
+
+Before #24 that ladder read:
 
 ```
 PSY 532:0   RON 310:20   GUA 460:6   LUC 389:86   KIL 2:337   BES 11:1255
