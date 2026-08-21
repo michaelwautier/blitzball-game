@@ -171,9 +171,13 @@ export function openEncounter(
 
   return {
     carrierId: carrier.id,
+    // Whatever technique a defender is bringing counts towards the attack the
+    // menu advertises, since it counts towards the tackle that gets rolled. The
+    // user's side has not chosen yet, so this is what they would bring
+    // unprompted; `restateDefence` corrects it once they have.
     defenders: defenders.map((d) => ({
       id: d.id,
-      attack: effectiveStat(d, 'at'),
+      attack: tackleAttack(d),
       block: effectiveStat(d, 'bl'),
     })),
     kind: 'contested',
@@ -182,6 +186,20 @@ export function openEncounter(
     // Being run at is a decision too: the carrier waits on the defence.
     awaitingDefence: defenders.some((d) => d.team === USER_TEAM),
     defence: null,
+  }
+}
+
+/**
+ * Re-take the attack snapshot once the defence has said how it is coming in.
+ *
+ * A chosen technique may be a different one from the default, or none at all,
+ * and either changes what will be rolled. Without this the menu would go on
+ * advertising the attack the defenders would have brought had nobody asked.
+ */
+export function restateDefence(state: MatchState, encounter: Encounter): void {
+  for (const engaged of encounter.defenders) {
+    const defender = playerById(state, engaged.id)
+    if (defender) engaged.attack = tackleAttack(defender, encounter.defence)
   }
 }
 
@@ -457,10 +475,12 @@ function concedePossession(
   state: MatchState,
   tackler: Player,
   carrier: Player,
-  defence: DefenceChoice | null = null,
+  technique: Technique | null = null,
 ): string {
   awardExp(state, tackler, 'tackle')
-  const technique = useTackleTechnique(tackler, carrier, defence)
+  // The condition lands on winning the ball, not on trying: the technique was
+  // paid for and its AT counted at the roll, and this is the rest of it.
+  if (technique?.inflicts) applyStatus(carrier, technique.inflicts)
   giveBallTo(state, tackler)
   // Beaten, and out of the play for it — see the constant. Applied after
   // `giveBallTo`, which is what would otherwise leave them free to turn straight
@@ -554,7 +574,12 @@ export function stepChallenge(state: MatchState, dt: number, run: ChallengeRun):
   const defender = playerById(state, next.id)
   if (!defender) return stepChallenge(state, 0, run)
 
-  const tackle = rollStat(effectiveStat(defender, 'at'), state.rng)
+  // Committed before the roll rather than after it. A tackle technique adds AT,
+  // as it does in FFX, and a bonus applied to a contest already won would be no
+  // bonus at all — it would only ever decorate a tackle that had landed anyway.
+  // Charged here for the same reason: it is spent on the attempt.
+  const technique = commitTackleTechnique(defender, run.defence)
+  const tackle = rollStat(effectiveStat(defender, 'at') + (technique?.power ?? 0), state.rng)
   run.rolls.push(tackle)
   run.beaten.push(next)
   run.endurance -= tackle
@@ -573,7 +598,7 @@ export function stepChallenge(state: MatchState, dt: number, run: ChallengeRun):
     })
     run.queue.length = 0
     pushPastCarrier(state, [defender], carrier, defender)
-    announceChallenge(state, `${sums} · ${concedePossession(state, defender, carrier, run.defence)}`)
+    announceChallenge(state, `${sums} · ${concedePossession(state, defender, carrier, technique)}`)
     state.phase = { kind: 'play' }
     return
   }
@@ -705,9 +730,8 @@ function pushPastCarrier(
  * With nothing chosen, as when the AI defends, the first affordable technique
  * fires automatically.
  */
-export function useTackleTechnique(
+export function tackleTechniqueFor(
   tackler: Player,
-  victim: Player,
   defence: DefenceChoice | null = null,
 ): Technique | null {
   const known = techniquesOf(tackler.def.techniques, 'tackle')
@@ -717,13 +741,31 @@ export function useTackleTechnique(
     ? known.filter((t) => t.id === defence.techniqueId)
     : known
 
-  for (const technique of candidates) {
-    if (!canAfford(tackler, technique.hpCost)) continue
-    spendHp(tackler, technique.hpCost)
-    if (technique.inflicts) applyStatus(victim, technique.inflicts)
-    return technique
-  }
-  return null
+  return candidates.find((technique) => canAfford(tackler, technique.hpCost)) ?? null
+}
+
+/** The same, and pay for it. */
+export function commitTackleTechnique(
+  tackler: Player,
+  defence: DefenceChoice | null = null,
+): Technique | null {
+  const technique = tackleTechniqueFor(tackler, defence)
+  if (technique) spendHp(tackler, technique.hpCost)
+  return technique
+}
+
+/**
+ * What a defender will actually roll: their attack, plus whatever technique they
+ * are bringing.
+ *
+ * Used for the snapshot the menu reads *and* for the roll itself, so the odds
+ * shown and the odds rolled cannot drift apart. They did, briefly: giving tackle
+ * techniques their AT+3 without telling `tackleRange` meant the menu advertised
+ * a range the tackle could exceed, which is the one thing the snapshot exists to
+ * prevent.
+ */
+export function tackleAttack(defender: Player, defence: DefenceChoice | null = null): number {
+  return effectiveStat(defender, 'at') + (tackleTechniqueFor(defender, defence)?.power ?? 0)
 }
 
 /** Tackle techniques the user's engaged defenders could bring to bear. */

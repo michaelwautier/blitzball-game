@@ -15,6 +15,7 @@ import {
   openEncounter,
   openOnTheBall,
   resolveEncounter,
+  restateDefence,
   stepChallenge,
 } from '../encounter/encounter'
 import { kickoffPosition } from './formation'
@@ -584,6 +585,9 @@ export function submitDefence(state: MatchState, techniqueId: string | null): bo
 
   encounter.defence = { techniqueId }
   encounter.awaitingDefence = false
+  // The choice changes what will be rolled, so it changes what the menu should
+  // be showing the carrier they are up against.
+  restateDefence(state, encounter)
   return true
 }
 

@@ -447,6 +447,36 @@ against the ladder alone.
     against a pool 300 across**. An unmarked passer can reach anyone, always. Passing range only
     binds when someone is blocking — which is most of the time the menu is open, so the range
     labels from 13 still earn their place, but a keeper's distribution is now never in doubt.
+22. **Techniques that count** ✅ (#58). Checked against the original's own tables. FFX is
+    strikingly uniform: **every technique gives +3** to the stat it modifies, and only Jecht
+    Shot breaks it, at +5. Ours had drifted to a scatter of 0, 1, 2, 3, 5 and 9, invented one at
+    a time — which made a couple strictly better than the rest and left **both tackle techniques
+    giving nothing at all**.
+    Worse than nothing, in fact: `useTackleTechnique` fired *after* the challenge was decided,
+    so it could inflict a condition but never help win the ball. It is now committed before the
+    roll and its AT counts, which is what FFX means by AT+3. Paid for on the attempt rather than
+    on success, since that is when it is thrown.
+    That opened a gap the snapshot exists to prevent — the menu advertised an attack range the
+    tackle could exceed — so `tackleAttack` is now the single source for both the snapshot and
+    the roll, and `restateDefence` re-takes it when the defence commits.
+    The bonus is on screen in both menus: `+3 AT`, `+5 SH`, before the HP price.
+    **Sphere Shot is the exception and stays ours.** It is the one technique the source gives no
+    number for — "a random amount of extra SH" — so there is nothing to be faithful to.
+    Flattening it to 5 with the rest was tried and rejected on the ladder: Basik carries it and
+    is the Ronso's only shooter, and it took them from second to fourth with their goals for cut
+    by two thirds. Correcting what the source specifies is fidelity; changing what it leaves
+    open is a balance decision wearing fidelity's clothes.
+    **The HP costs deliberately do not follow the original**, and the gap is wide: FFX charges 8
+    to 120 where we charge 10 to 24. Its HP economy is scaled differently — a carrier there does
+    not lose HP simply for swimming — so importing those figures would make techniques
+    unaffordable rather than expensive. A balance question for its own PR if it is ever wanted.
+    Ladder: the +3s lifted scoring 2.58 → 2.99, and `SHOT_DECAY_PER_UNIT` 0.468 → 0.51 brings it
+    to **2.61**, near where it started. Two things moved and both are worth knowing. **Kilika
+    climb off the bottom for the first time** (79 → 119, above Besaid) — they hold two venom
+    shots and two tackle techniques, so the uniform +3 suits them. And the **Guado stop scoring
+    almost entirely** (62 goals in 200 matches down to 19): every technique they own is a pass
+    or a tackle, so the +3s do nothing for their shooting while the decay tune costs them.
+    Both halves of **#25** move again, in opposite directions again.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

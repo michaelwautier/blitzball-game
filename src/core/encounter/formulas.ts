@@ -59,7 +59,7 @@ export const PASS_DECAY_PER_UNIT = 0.06 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
  * with: four hundredths of the pool either way is the difference between one
  * goal a match and nearly six.
  */
-export const SHOT_DECAY_PER_UNIT = 0.468 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
+export const SHOT_DECAY_PER_UNIT = 0.51 * (REFERENCE_POOL_RADIUS / POOL_RADIUS)
 
 /**
  * Roll a contested stat: between half and one and a half times its value.
