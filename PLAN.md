@@ -217,6 +217,23 @@ against the ladder alone.
    `POOL_RADIUS` scales `ENGAGE_RADIUS`, both decay rates and `SHOOTING_STANDOFF` — the three
    most sensitive numbers in the game. Ladder before and after, and tuned back to roughly 2.4
    goals a match rather than accepting whatever falls out.
+11. **Camera: follow what matters, and behave the same everywhere** ✅ (#40). Pulled forward
+    out of order, being bugs plus a small feature rather than the balance-affecting resize in
+    9.
+    The camera trailed in depth by a *damped* fraction, so at the far edge of the pool it ended
+    up level with the player and they left the frame. It now trails by the same stand-off in
+    the same direction from anywhere in the pool — which means at the edge it sits outside the
+    sphere looking in, and that is fine: checked on screen, the water renders perfectly well
+    from outside. The obvious repair instead, retreating towards the middle, is far worse than
+    the bug, because it swings the camera round to the other side of the player and inverts the
+    controls mid-swim. Sameness of behaviour beats any framing.
+    The camera also follows **the ball** while it is in the air, rather than the player who let
+    go of it, and **a teammate being considered for a pass** while that choice is open.
+    The preview felt expensive and is not: a preview frame measures *cheaper* than an ordinary
+    one, at 0.045ms against 0.074ms. What it is, is slow — a second and a half to arrive, so
+    arrowing down a list leaves the camera sliding. A quicker ease for menu selections was
+    tried and rejected on taste: the long sweep across the pool is worth more than the
+    promptness. Kept as a single ease for everything.
 10. **Team strategies.** The first genuinely tactical decision the user gets. Each side plays a
     defensive shape with real trade-offs — pressing commits everyone to the carrier and leaves
     the passing lanes open; zone holds shape and concedes the carrier room; man-marking sits
