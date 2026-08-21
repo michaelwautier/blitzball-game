@@ -15,8 +15,10 @@ import {
   openEncounter,
   openOnTheBall,
   resolveEncounter,
+  stepChallenge,
 } from '../encounter/encounter'
 import { kickoffPosition } from './formation'
+import { announce } from './announce'
 import { stepFlight } from './flight'
 import {
   PLAYER_RADIUS,
@@ -43,6 +45,7 @@ import {
 } from './types'
 
 export * from './types'
+export { ANNOUNCEMENT_SECONDS, announce } from './announce'
 
 /**
  * Length of each half, in seconds. FFX's own figure.
@@ -63,8 +66,6 @@ export const HALF_SECONDS = 300
 /** How long the half-time break holds before the restart. */
 export const HALF_TIME_SECONDS = 2.5
 
-/** How long an announcement stays on screen. */
-export const ANNOUNCEMENT_SECONDS = 1.8
 
 /** Drag on a loose ball: the fraction of its speed retained per second. */
 const BALL_DRAG = 0.35
@@ -222,10 +223,6 @@ function restartTaker(state: MatchState, team: TeamId): Player | undefined {
 }
 
 /** Post a message for the on-screen banner. */
-export function announce(state: MatchState, text: string): void {
-  state.announcement = text
-  state.announcementTimer = ANNOUNCEMENT_SECONDS
-}
 
 /**
  * Advance the match by one tick.
@@ -252,6 +249,16 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput = NO_
       advanceLunges(state, dt)
       stepEncounter(state, dt, state.phase.encounter)
       break
+    case 'challenge': {
+      // A breakthrough playing out. The world is held exactly as it is for the
+      // decision that led here — the clock included, so watching the tackles
+      // land one at a time costs nothing — but the lunges still run.
+      const { challenge } = state.phase
+      holdStill(state)
+      advanceLunges(state, dt)
+      stepChallenge(state, dt, challenge)
+      break
+    }
     case 'flight': {
       // Nobody swims while the ball is in the air, as in FFX: the throw has been
       // made, and where everyone stood when it left is where it finds them. It
@@ -610,7 +617,13 @@ function applyEncounterAction(
     return
   }
 
-  // The encounter is over however it went, so everyone still in it has
+  // A breakthrough has not finished happening yet — it is playing out one tackle
+  // at a time, and settles its own defenders when it lands. Charging them here
+  // would spend the moment of defenders the challenge may hand the encounter
+  // straight back to.
+  if (state.phase.kind === 'challenge') return
+
+  // Otherwise the encounter is over however it went, so everyone still in it has
   // committed and spent their moment.
   chargeCommittedDefenders(state, encounter)
 

@@ -344,6 +344,32 @@ against the ladder alone.
     fewer are decided by one. The table order is unchanged.
     Side effect worth having: `POOL_RADIUS` is now a real lever on traversal time rather than a
     purely visual one. At half power, doubling the radius makes crossing take about 1.4× as long.
+17. **A breakthrough you can watch** ✅ (#53). Reported from play, from a screenshot: a
+    breakthrough was attempted, the ball was lost, and the next thing on screen was a "how do
+    you challenge?" menu with nothing to say what had gone wrong. Three faults in one moment.
+    **The tackles landed together.** Both rolls happened inside the tick that committed them and
+    were reported as one line — `EN 14 − 6 − 5 = 3`. Correct, and unreadable. A new `challenge`
+    phase queues the defenders and takes them in turn, `TACKLE_BEAT` apart, naming each one as
+    they are gone past. The order is the one the menu named and the one the rolls always used;
+    only the pacing is new.
+    **The endurance jumped.** It went from full to spent between two frames. `state.endurance`
+    now follows the run down, so there are three readings across two defenders rather than two.
+    **Play stopped afterwards.** `pushPastCarrier` charges recovery to defenders and
+    `chargeCommittedDefenders` charges a cooldown to defenders — nothing was ever charged to the
+    carrier who *lost the ball*. So the dispossessed player kept full agency and could challenge
+    back on the next frame, and the space bar that confirms a breakthrough is the same one that
+    challenges. `DISPOSSESSED_RECOVERY` fixes it: beaten is beaten, whichever end of the
+    challenge you were on. Losing the ball now returns to open play with the winner swimming
+    off, and the event marked rather than interrupted.
+    The camera holds its encounter close-in through the challenge, which is the part worth
+    watching.
+    Ladder, 600 fixtures: **2.59 → 2.61 goals a match**, goalless unchanged at 34%, table order
+    unchanged. Two accidents were caught by measuring rather than assuming, both worth recording.
+    Charging the committed defenders on the tick that *starts* the challenge rather than when it
+    lands weakens every defence that a partial break hands the encounter back to — bit-identical
+    on the ladder as it happens, because a beaten defender's recovery already covers it, but
+    wrong. And separating bodies during the challenge freeze, which the encounter freeze
+    forbids, was worth 0.17 goals a match on its own.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

@@ -221,12 +221,14 @@ describe('technique effects', () => {
     const encounter = openEncounter(state, carrier, engagingDefenders(state, carrier))
     encounter.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    // The tackle lands a beat into the challenge rather than on the tick that
+    // commits it, so the outcome is read once it has played out.
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    for (let i = 0; i < 300 && state.phase.kind === 'challenge'; i++) stepMatch(state, 1 / 60)
 
-    expect(result.success).toBe(false)
     expect(state.ball.carrier).toBe(doram.id)
     expect(hasStatus(carrier, 'poison')).toBe(true)
-    expect(result.summary).toContain('Venom Tackle')
+    expect(state.announcement).toContain('Venom Tackle')
   })
 
   it('does not fire a tackle technique the defender cannot pay for', () => {
