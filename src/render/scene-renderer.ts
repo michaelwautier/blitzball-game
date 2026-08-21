@@ -8,6 +8,7 @@ import {
   type Side,
 } from '../core/pitch'
 import { PLAYER_RADIUS } from '../core/match/movement'
+import { edgeMarker, type EdgeMarker } from './off-screen'
 import { statusLabels } from '../core/match/status'
 import { isExhausted } from '../core/match/stats'
 import { carrierOf, opponentOf, playerById } from '../core/match/queries'
@@ -123,6 +124,8 @@ export class SceneRenderer {
   private readonly lookGoal = new THREE.Vector3()
   private started = false
 
+  private marker: EdgeMarker | null = null
+
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setClearColor(COLOURS.background, 1)
@@ -178,6 +181,27 @@ export class SceneRenderer {
 
     this.followPlayer(state, dt, focusId, alpha)
     this.renderer.render(this.scene, this.camera)
+    this.marker = this.markBall()
+  }
+
+  /**
+   * Where the ball is, for anything drawn on top of the scene — or null while it
+   * is in view and needs no help.
+   *
+   * Read after `draw`, since it is the camera's own answer for the frame that
+   * was just rendered rather than a separate guess at where things ended up.
+   */
+  ballMarker(): EdgeMarker | null {
+    return this.marker
+  }
+
+  private markBall(): EdgeMarker | null {
+    // Camera space first, purely to ask which side of the lens it is on: a
+    // projection alone cannot tell "far in front" from "behind", having mirrored
+    // the second through the origin.
+    const seen = this.ball.position.clone().applyMatrix4(this.camera.matrixWorldInverse)
+    const projected = this.ball.position.clone().project(this.camera)
+    return edgeMarker(projected.x, projected.y, seen.z > 0)
   }
 
   dispose(): void {

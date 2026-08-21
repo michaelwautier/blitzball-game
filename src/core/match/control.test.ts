@@ -3,6 +3,8 @@ import { createMatch, stepMatch, switchControlled } from './state'
 import { giveBallTo } from './possession'
 import type { MatchState, Player } from './types'
 import { BESAID_AUROCHS, LUCA_GOERS } from '../../data/teams'
+import { ENGAGE_RADIUS } from '../encounter/encounter'
+import { POOL_RADIUS } from '../pitch'
 
 const TICK = 1 / 60
 const newMatch = (seed = 'control') => createMatch(BESAID_AUROCHS, LUCA_GOERS, seed)
@@ -245,5 +247,58 @@ describe('when the opposition throw', () => {
     stepMatch(state, TICK)
 
     expect(state.controlled).not.toBe(keeper.id)
+  })
+})
+
+/**
+ * Being asked to defend an encounter you are nowhere near.
+ *
+ * Control is sticky, so the defender who closed the carrier down is very often
+ * not the one you were swimming — and the camera follows whoever you are
+ * steering. The menu would ask how your defence is challenging while showing you
+ * a player at the other end of the pool.
+ */
+describe('when an encounter opens against us', () => {
+  it('hands over one of the defenders actually in it', () => {
+    const state = newMatch('into-the-encounter')
+    const carrier = find(state, 'away:bickson')
+    carrier.x = 0
+    carrier.y = 0
+    giveBallTo(state, carrier)
+    state.phase = { kind: 'play' }
+    state.engageCooldown = 0
+
+    // Letty is on them; the player being steered is miles away.
+    const letty = find(state, 'home:letty')
+    letty.x = ENGAGE_RADIUS - 1
+    letty.y = 0
+    const stranded = find(state, 'home:datto')
+    stranded.x = -POOL_RADIUS * 0.8
+    stranded.y = POOL_RADIUS * 0.5
+    state.controlled = stranded.id
+
+    stepMatch(state, TICK)
+
+    expect(state.phase.kind).toBe('encounter')
+    expect(state.controlled).toBe(letty.id)
+  })
+
+  it('leaves control alone when the encounter is our own carrier being caught', () => {
+    // Attacking, the carrier is already the one being steered, and the defenders
+    // in the encounter are theirs. Nothing to move to.
+    const state = newMatch('our-own')
+    const carrier = find(state, 'home:wakka')
+    carrier.x = 0
+    carrier.y = 0
+    giveBallTo(state, carrier)
+    state.phase = { kind: 'play' }
+    state.engageCooldown = 0
+
+    const doram = find(state, 'away:doram')
+    doram.x = ENGAGE_RADIUS - 1
+    doram.y = 0
+
+    stepMatch(state, TICK)
+    expect(state.controlled).toBe(carrier.id)
   })
 })
