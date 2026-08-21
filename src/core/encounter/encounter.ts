@@ -28,11 +28,16 @@ import { awardExp } from '../match/exp'
  * get close enough to trigger one, and must stay above `MARKING_DISTANCE` so a
  * defender at its marking station is genuinely on the carrier.
  *
- * Grows with the square root of the pool rather than not at all. Bodies staying
- * the same size is what turns a bigger pool into more room, but leaving reach
- * fixed as well meant defenders covered so much less of it that scoring rose by
- * half. The square root splits the difference: still markedly more space, without
- * the defence being spread to nothing.
+ * Scales with the pool, in proportion. Bodies deliberately do not — that is what
+ * turns a bigger pool into more space rather than the same game drawn larger —
+ * but reach is not a body, and leaving it fixed meant defenders covered so much
+ * less of the water that attackers ran clear and scoring reached 24 a match.
+ *
+ * The square root was tried first, as the halfway house between the two, and
+ * replaced by full proportion in #15 once the pool had more than doubled: at
+ * that size the square root was still leaving two defenders unable to close
+ * anyone down. Read that alongside `MAX_ENGAGED` and the coverage weights, which
+ * were set against this reach and would need re-measuring if it moved.
  */
 export const ENGAGE_RADIUS =
   PLAYER_RADIUS * 2.3 * (POOL_RADIUS / REFERENCE_POOL_RADIUS)
