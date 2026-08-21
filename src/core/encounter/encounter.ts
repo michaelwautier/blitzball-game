@@ -1,4 +1,4 @@
-import { POOL_RADIUS, clampToPool } from '../pitch'
+import { POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
 import { attackDirection } from '../match/formation'
 import { PLAYER_RADIUS, REFERENCE_POOL_RADIUS } from '../match/movement'
 import { distanceBetween, opponentOf, playerById } from '../match/queries'
@@ -201,14 +201,35 @@ function stageDefenders(state: MatchState, carrier: Player, defenders: Player[])
   // Fan away from the nearer wall, so nobody is staged outside the pool.
   const away = carrier.y >= 0 ? -1 : 1
 
-  defenders.forEach((defender, rank) => {
-    const spot = clampToPool(
+  const spotAt = (rank: number): Vec2 =>
+    clampToPool(
       {
         x: carrier.x + forward * ENGAGE_RADIUS * 0.8,
         y: carrier.y + away * rank * PLAYER_RADIUS * 2.4,
       },
       PLAYER_RADIUS,
     )
+
+  // Anyone not in this confrontation is furniture to be staged around. The spot
+  // is worked out from the carrier alone, so without this a defender settles
+  // into whoever happens to be standing in front of them — and stays there,
+  // because bodies are not separated while the world is frozen for the menu.
+  // The overlap then lasts the whole decision rather than a moment.
+  const bystanders = state.players.filter(
+    (player) => player !== carrier && !defenders.includes(player),
+  )
+
+  let rank = 0
+  for (const defender of defenders) {
+    let spot = spotAt(rank)
+    // Step along the fan until the slot is free, rather than abandoning the
+    // tableau: the defenders still arrive in a line in front of the carrier,
+    // just further out along it.
+    for (let tried = 0; tried < STAGING_SLOTS && occupied(spot, bystanders); tried++) {
+      rank++
+      spot = spotAt(rank)
+    }
+    rank++
 
     defender.lunge = {
       fromX: defender.x,
@@ -220,7 +241,23 @@ function stageDefenders(state: MatchState, carrier: Player, defenders: Player[])
     }
     defender.vx = 0
     defender.vy = 0
-  })
+  }
+}
+
+/**
+ * How far along the fan the staging will look for a clear slot.
+ *
+ * Bounded so a crowded pool cannot walk a defender off into open water hunting
+ * for room. Running out means staging on someone, which is what happened every
+ * time before.
+ */
+const STAGING_SLOTS = 6
+
+/** Whether a staged spot would land inside a body already standing there. */
+function occupied(spot: Vec2, bystanders: readonly Player[]): boolean {
+  return bystanders.some(
+    (player) => Math.hypot(player.x - spot.x, player.y - spot.y) < PLAYER_RADIUS * 2,
+  )
 }
 
 /**
