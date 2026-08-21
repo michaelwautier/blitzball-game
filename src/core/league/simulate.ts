@@ -33,6 +33,15 @@ export interface SimulatedMatch {
   encounters: number
   shots: number
   breakthroughs: number
+  /**
+   * What everyone earned, keyed `teamId:playerId` and ready to be banked.
+   *
+   * Keyed by the *team* rather than by which end they played at, because a
+   * career belongs to a player and not to a fixture. Returned rather than
+   * applied here: this module simulates, and whether a result is kept is the
+   * league's business.
+   */
+  exp: Record<string, number>
 }
 
 /**
@@ -58,6 +67,7 @@ export function simulateMatch(
     encounters: 0,
     shots: 0,
     breakthroughs: 0,
+    exp: {},
   }
 
   let previousPhase = state.phase.kind
@@ -102,5 +112,16 @@ export function simulateMatch(
 
   result.home = state.teams.home.score
   result.away = state.teams.away.score
+
+  // Everyone who did something earned something, both sides alike. Translated
+  // out of the fixture's own `home:` / `away:` naming and into the team's, so a
+  // player carries one career whichever end they happen to be playing at.
+  for (const player of state.players) {
+    const earned = state.exp[player.id] ?? 0
+    if (earned <= 0) continue
+    const team = player.team === 'home' ? home : away
+    result.exp[`${team.id}:${player.def.id}`] = earned
+  }
+
   return result
 }

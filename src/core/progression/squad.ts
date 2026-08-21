@@ -1,5 +1,5 @@
 import type { TeamDef } from '../../data/types'
-import { findPlayer } from '../../data/teams'
+import { findPlayer, findTeam } from '../../data/teams'
 import type { CareerLookup } from '../match/state'
 import type { MatchState, TeamId } from '../match/types'
 import { awardExperience, createCareer, type CareerProgress, type PlayerCareer } from './career'
@@ -71,6 +71,30 @@ export class Squad {
     }
 
     return progress.sort((a, b) => b.expGained - a.expGained)
+  }
+
+  /**
+   * Bank experience from a match nobody watched.
+   *
+   * The fixtures the user is not in are played by the same engine, and until now
+   * everyone in them earned experience that was thrown away the moment the
+   * scoreline was recorded. So the user's squad improved every week and the five
+   * sides they were chasing stood still for ever — which made a season a
+   * procession rather than a league, and got worse the longer one went on.
+   *
+   * Takes what `simulateMatch` reports, keyed `teamId:playerId`, and applies it
+   * exactly as a watched match's would be.
+   */
+  bank(exp: Readonly<Record<string, number>>): void {
+    for (const [key, earned] of Object.entries(exp)) {
+      if (earned <= 0) continue
+      const separator = key.indexOf(':')
+      if (separator < 0) continue
+
+      const team = findTeam(key.slice(0, separator))
+      const def = team && findPlayer(team, key.slice(separator + 1))
+      if (def) awardExperience(def, this.career(key), earned)
+    }
   }
 
   /** Every career recorded so far, for saving or inspection. */

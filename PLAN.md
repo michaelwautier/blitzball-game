@@ -488,9 +488,16 @@ No order chosen yet. The candidates, roughly by size:
 - **Free agents and contracts.** The 23 free agents from the source data, with salaries and
   contract lengths in matches, plus the prize money to pay them. The roster is transcribed and
   ready; this needs somewhere to put a signing, so it probably wants lineup control first.
-- **Careers for the AI sides** (issue #25). Only your squad levels up, so the league stands
-  still while you improve. Fixing that would keep later seasons competitive, and is the most
-  likely cure for the toothless teams below.
+- **Careers for the AI sides** ✅ (#59). Done, and it was two faults rather than one. The
+  fixtures the user is not in are played by the real engine and everyone in them *was* earning
+  experience — which was thrown away the moment the scoreline was recorded. And
+  `simulateRound`'s `careers` parameter had never been passed by any caller, nor could it have
+  worked: a `CareerLookup` answers questions about `home:` and `away:`, which mean different
+  players in every fixture of a round, so one lookup could only ever have been right for one of
+  them. It is a `SeasonCareers` now — a lookup *factory* plus somewhere to bank — described
+  structurally so the league still knows nothing about `progression/` beyond handing things to
+  it. `Squad` satisfies it without being imported.
+  The ladder is unmoved to the digit, as it must be: it passes no careers, so none of this runs.
 - **Play it and fix what grates.** All balance so far was tuned by simulation, which says
   nothing about how a half *feels* — encounter frequency, camera, menu pacing, match length.
 

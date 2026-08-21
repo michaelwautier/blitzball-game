@@ -13,7 +13,9 @@ import {
   totalRounds,
 } from './season'
 import { involves } from './fixtures'
-import { TEAMS } from '../../data/teams'
+import { TEAMS, findTeam } from '../../data/teams'
+import { Squad } from '../progression/squad'
+import { simulateMatch } from './simulate'
 
 const IDS = TEAMS.map((team) => team.id)
 const USER = 'aurochs'
@@ -235,5 +237,70 @@ describe('replaying a season', () => {
     const season = newSeason()
     const seeds = season.fixtures.map((fixture) => fixtureSeed(season, fixture))
     expect(new Set(seeds).size).toBe(seeds.length)
+  })
+})
+
+/**
+ * Everybody improves, not only the side being watched.
+ *
+ * The fixtures the user is not in are played by the same engine, and everyone in
+ * them was earning experience that was thrown away the moment the scoreline was
+ * recorded. So the user's squad improved every week while the five sides they
+ * were chasing stood still for ever — a procession rather than a league, and
+ * worse the longer a career went on.
+ */
+describe('the league improving alongside you', () => {
+  it('banks what the sides you are not watching earn', () => {
+    const season = createSeason(IDS, 'aurochs', 'levelling')
+    const squad = new Squad()
+
+    simulateRound(season, 1, squad)
+
+    // Somebody who was nowhere near the user's fixture has a career now.
+    const earned = squad.all()
+    expect(earned.length).toBeGreaterThan(0)
+    expect(earned.some((career) => !career.playerId.startsWith('aurochs:'))).toBe(true)
+  })
+
+  it('leaves them at a higher level after a full season than before it', () => {
+    const season = createSeason(IDS, 'aurochs', 'a-whole-season')
+    const squad = new Squad()
+
+    simulateRestOfSeason(season, squad)
+
+    const levelled = squad.all().filter((career) => career.level > 1)
+    expect(levelled.length, 'nobody in the league levelled up all season').toBeGreaterThan(0)
+  })
+
+  it('keeps one career per player however many fixtures they play', () => {
+    // Careers are keyed by team and player, not by which end of a fixture they
+    // happened to line up at, so a player carries one record all season.
+    const season = createSeason(IDS, 'aurochs', 'one-career')
+    const squad = new Squad()
+
+    simulateRestOfSeason(season, squad)
+
+    const ids = squad.all().map((career) => career.playerId)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const id of ids) expect(id).not.toContain('home:')
+  })
+
+  it('plays the unwatched fixtures at the levels those sides have reached', () => {
+    // Not just banking: the next round has to be played by the improved side,
+    // or a league that levels up plays exactly like one that does not.
+    const season = createSeason(IDS, 'aurochs', 'plays-levelled')
+    const squad = new Squad()
+    simulateRestOfSeason(season, squad)
+
+    const raw = createSeason(IDS, 'aurochs', 'plays-levelled')
+    const fixture = raw.fixtures.find((f) => !involves(f, 'aurochs'))!
+    const home = findTeam(fixture.home)
+    const away = findTeam(fixture.away)
+
+    const withCareers = simulateMatch(home, away, 'compare', squad.lookupFor({ home, away }))
+    const without = simulateMatch(home, away, 'compare')
+
+    // Same fixture, same seed; the only difference is who is playing it.
+    expect(withCareers).not.toEqual(without)
   })
 })
