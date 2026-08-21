@@ -242,6 +242,20 @@ against the ladder alone.
     than constant. Each team gets a default that suits its squad: the Guado's blocking suits a
     zone, the Ronso's attack suits pressing. Needs a ladder pass *per strategy* to show each is
     viable rather than one being strictly best, which is the whole point of having them.
+12. **The menu follows the ball** ✅ (#42, fixing #41). Found by playing, and invisible to
+    every test and every simulated season: the menu reset its step when the *defenders*
+    changed but never when the **carrier** did, and it stays open across a turnover because we
+    are asked how the defence challenges. So a half-finished question about your own carrier —
+    a list of pass targets — survived possession flipping and was re-rendered against the
+    opponent now on the ball, offering *their* teammates as receivers. The engine refused those
+    answers, correctly, and Escape only stepped back to an action list for the same wrong
+    carrier, so there was no way to confirm and no way out.
+    The fix is one idea: a step belongs to an encounter, and cannot outlive it. `restart()`
+    asks the new encounter's own opening question, and is called whenever the carrier changes
+    as well as whenever the menu opens; while the defence is being asked, the defence is the
+    only question there is. All four regression tests were checked against the old code first
+    — one of them originally passed there, guarding nothing, and was sharpened until it
+    reproduced the trap the way a player reaches it.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
