@@ -405,6 +405,28 @@ against the ladder alone.
     `previewsShot()` is the menu's answer, alongside `previewTargetId()` — which row a cursor
     sits on is a question the UI asks, never something written into match state.
     UI only; no ladder.
+20. **Sound** ✅ (#56). Shoot, pass, tackle, goal, save, breakthrough, the encounter opening,
+    and the whistle. **Synthesised rather than sampled** — oscillators and filtered noise built
+    at the moment each plays — so the repository stays free of binary assets and licences, and
+    every sound sits where all the other tunables do: in code, as named numbers with a note on
+    why. All of it runs through one low-pass, because all of it happens underwater; that single
+    filter is what stops a set of dry synth blips sounding like a menu.
+    Split in two, along the line that decides what is worth testing. `audio/events.ts` derives
+    *what happened* from two frames of the phase machine and is pure and tested — sixteen tests,
+    including a full match asserting no frame ever reports both a goal and a save, or both a
+    tackle and a breakthrough. `audio/sounds.ts` decides what a tackle sounds like, which is
+    taste and is not tested.
+    The engine is never told anyone is listening: the sounds are read from outside exactly as
+    the renderer reads positions. `CLAUDE.md` now says so as a rule, since an event fired *for*
+    the presentation is the tempting thing to add and the thing to avoid.
+    `m` mutes. Nothing plays before the first keypress, which browsers require anyway.
+    The whistle is the one exception to the water, and had to be: sitting at 1900–2100Hz against
+    a 2200Hz cutoff it was inaudible, because right on the knee a square wave loses every
+    harmonic that makes it shrill and what survives is a quiet sine. It now takes a dry bus, at
+    a lower pitch with a breath of noise over it — which is also the truer story, since a
+    whistle is blown *above* the water by someone who means to be heard through it. It blows at
+    kick-off and at the restart too, not only at the two ends: a half is five minutes, and a
+    sound nobody hears for five minutes is indistinguishable from one that does not work.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

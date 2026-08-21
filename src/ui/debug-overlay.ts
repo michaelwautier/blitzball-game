@@ -34,7 +34,7 @@ export class DebugOverlay {
       'space to stop and look up, or to challenge when defending',
       'tab / q to switch player',
       'arrows and space to choose in an encounter',
-      '~ toggle overlay',
+      'm to mute · ~ toggle overlay',
     ].join('\n')
   }
 }

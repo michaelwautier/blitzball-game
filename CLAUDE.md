@@ -32,9 +32,14 @@ things worse.
 
 ## The core stays pure
 
-`core/` must not import from `render/` or `ui/`. That separation is what made the 3D swap a
-renderer change with no effect on gameplay, and what lets the league simulate its own fixtures
-with the identical engine.
+`core/` must not import from `render/`, `ui/` or `audio/` — nothing outward, ever. That
+separation is what made the 3D swap a renderer change with no effect on gameplay, and what lets
+the league simulate its own fixtures with the identical engine.
+
+It runs the other way too: the simulation is never told it is being watched or listened to.
+Both the renderer and the sound read what happened off the phase machine from outside, so
+adding either changed nothing about how a match plays. Keep it that way — an event the engine
+fires *for the benefit of the presentation* is the thing to avoid.
 
 ## One dev server, ever
 
