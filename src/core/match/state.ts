@@ -1,6 +1,6 @@
 import { Rng } from '../rng'
 import { currentStats, type PlayerCareer } from '../progression/career'
-import { BALL_RADIUS, POOL_RADIUS, clampToPool } from '../pitch'
+import { BALL_RADIUS, POOL_RADIUS, clampToPool, type Vec2 } from '../pitch'
 import { POSITION_KEYS, type TeamDef } from '../../data/types'
 import { findPlayer } from '../../data/teams'
 import { desiredPosition } from '../ai/positioning'
@@ -624,11 +624,40 @@ function updateControlled(state: MatchState): void {
     return
   }
 
+  // The opposition have thrown, and where the ball is going is where the next
+  // thing happens. Chasing the player who let go of it is chasing nothing.
+  const meeting = interceptionPoint(state)
+  if (meeting) {
+    const nearest = nearestTo(state, meeting)
+    if (nearest) {
+      state.controlled = nearest.id
+      return
+    }
+  }
+
   const current = playerById(state, state.controlled)
   if (current && current.team === USER_TEAM && current.slot !== 'GK') return
 
   // Nothing valid held — at kickoff, or after the keeper had it.
   state.controlled = nearestTo(state, state.ball)?.id ?? state.controlled
+}
+
+/**
+ * Where an opposition throw is going, if one is in the air.
+ *
+ * Only theirs: being handed a different player halfway through your own pass
+ * would take the ball off you mid-decision. Safe to ask every tick rather than
+ * only at the moment of release, because nobody swims while the ball is in the
+ * air — the answer cannot change until it lands, so this settles once and holds.
+ *
+ * A throw that arrives spent starts a second leg towards whoever gathers it, and
+ * that is still an opposition throw, so control follows the ball on to the
+ * player about to collect it.
+ */
+function interceptionPoint(state: MatchState): Vec2 | null {
+  if (state.phase.kind !== 'flight') return null
+  const { flight } = state.phase
+  return flight.fromTeam === USER_TEAM ? null : flight.target
 }
 
 /**
