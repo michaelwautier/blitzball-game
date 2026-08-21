@@ -146,3 +146,104 @@ describe('switching player', () => {
     expect(state.controlled).not.toBe(keeper.id)
   })
 })
+
+/**
+ * The one moment the game should choose for you.
+ *
+ * Control is otherwise sticky on purpose — being reassigned every tick made
+ * defending feel like something happening to you. A throw by the opposition is
+ * the exception: play stops dead while the ball travels, the contest has
+ * plainly moved to the other end of it, and staying behind on the player who
+ * let go of it means arriving nowhere.
+ */
+describe('when the opposition throw', () => {
+  /** Put an opposition throw in the air, aimed at a fixed point. */
+  function theyThrow(state: MatchState, target: { x: number; y: number }): void {
+    state.phase = {
+      kind: 'flight',
+      flight: {
+        kind: 'pass',
+        fromTeam: 'away',
+        passerId: 'away:bickson',
+        targetId: null,
+        target,
+        power: 20,
+        travelled: 0,
+        technique: null,
+        blockersIgnored: 0,
+      },
+    }
+  }
+
+  it('hands over whoever can meet the ball', () => {
+    const state = newMatch('meet-it')
+    const near = find(state, 'home:jassu')
+    near.x = 40
+    near.y = 30
+    for (const other of state.players.filter((p) => p.team === 'home' && p.id !== near.id)) {
+      other.x = -80
+      other.y = -30
+    }
+    state.controlled = 'home:tidus'
+
+    theyThrow(state, { x: 42, y: 32 })
+    stepMatch(state, TICK)
+
+    expect(state.controlled).toBe(near.id)
+  })
+
+  it('leaves your own throw alone', () => {
+    // Being handed a different player halfway through your own pass would take
+    // the ball off you mid-decision.
+    const state = newMatch('ours')
+    state.controlled = 'home:tidus'
+    theyThrow(state, { x: 42, y: 32 })
+    if (state.phase.kind !== 'flight') throw new Error('expected a flight')
+    state.phase.flight.fromTeam = 'home'
+
+    const jassu = find(state, 'home:jassu')
+    jassu.x = 42
+    jassu.y = 32
+
+    stepMatch(state, TICK)
+    expect(state.controlled).toBe('home:tidus')
+  })
+
+  it('follows a fumbled throw on to whoever is gathering it', () => {
+    // A throw that arrives spent starts a second leg towards the player
+    // collecting it. That is where the ball is going, so that is where control
+    // goes — it is about to be ours.
+    const state = newMatch('fumble')
+    const gatherer = find(state, 'home:datto')
+    gatherer.x = -30
+    gatherer.y = 20
+    for (const other of state.players.filter((p) => p.team === 'home' && p.id !== gatherer.id)) {
+      other.x = 70
+      other.y = -20
+    }
+    state.controlled = 'home:tidus'
+
+    theyThrow(state, { x: gatherer.x, y: gatherer.y })
+    if (state.phase.kind !== 'flight') throw new Error('expected a flight')
+    state.phase.flight.kind = 'spilled'
+    state.phase.flight.targetId = gatherer.id
+
+    stepMatch(state, TICK)
+    expect(state.controlled).toBe(gatherer.id)
+  })
+
+  it('never hands over the keeper to meet a shot', () => {
+    const state = newMatch('not-the-keeper')
+    const keeper = find(state, 'home:keepa')
+    state.controlled = 'home:tidus'
+    for (const other of state.players.filter((p) => p.team === 'home' && p.slot !== 'GK')) {
+      other.x = 90
+      other.y = 40
+    }
+
+    theyThrow(state, { x: keeper.x, y: keeper.y })
+    stepMatch(state, TICK)
+
+    expect(state.controlled).not.toBe(keeper.id)
+  })
+})

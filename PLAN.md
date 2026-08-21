@@ -275,6 +275,20 @@ against the ladder alone.
     coming from free turnovers both sides were handing each other; the table order is unchanged.
     Filtering on the *expected* case instead was tried and rejected — 1.71 goals a match, and it
     dropped the Ronso from second to third for no gain in honesty.
+14. **Control follows the throw** ✅ (#44). Requested: when the opposition pass or shoot, be
+    given the defender nearest the ball rather than left behind on whoever was being chased.
+    Control is otherwise sticky on purpose — reassigning every tick is what made defending feel
+    like something happening to you (see 7) — so this is one deliberate exception, and it is
+    the moment that earns it: play stops dead while the ball travels, and the contest has
+    plainly moved to the far end of it.
+    Control goes to whoever can meet the ball's *destination*, not the ball: chasing the player
+    who let go of it is chasing nothing. Only their throws, never yours. A fumbled throw starts
+    a second leg towards whoever gathers it, and control follows that too, so it is already on
+    the player about to have the ball. Safe to recompute every tick because nobody swims while
+    the ball is in the air — the answer cannot change until it lands.
+    Ladder: 1.89 → 1.96 goals a match, goalless 42% → 39%, table order unchanged. It touches
+    only the user's side, which is the home side in every simulated fixture, so it is worth
+    watching against **#32** rather than assumed neutral.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:
