@@ -35,6 +35,39 @@ const LEVELS: Record<MatchSound, number> = {
   whistle: 0.9,
 }
 
+/**
+ * The whistle, pulled out where it can be tuned by ear.
+ *
+ * It is the most exposed sound in the game — dry, high, and the only one not
+ * softened by the water — so it is also the easiest to get wrong. These are the
+ * numbers to push around, and none of them touch anything else.
+ *
+ *   `wave`    the timbre, and the biggest single change you can make.
+ *             'sine' is soft and flute-like, 'triangle' is a reedy middle,
+ *             'square' is a shrill plastic referee's whistle, 'sawtooth' is
+ *             harsher still. Try 'sine' first if the current one grates.
+ *   `blasts`  one entry per pip: [seconds, starting hertz, ending hertz].
+ *             A single short entry is a curt pip; two is the usual
+ *             half-time double. Equal from and to holds a flat note; a small
+ *             rise or fall gives it a bit of life.
+ *   `gap`     silence between pips, in seconds.
+ *   `breath`  how much air is mixed over the tone, as a fraction of its level.
+ *             0 is a pure electronic tone; 0.3 is breathy. Above about 0.5 it
+ *             stops sounding like a whistle and starts sounding like static.
+ *
+ * Pitch is the other obvious knob: whistles read as urgent between roughly 1000
+ * and 2000 hertz, and thin out either side of that.
+ */
+const WHISTLE = {
+  wave: 'triangle' as OscillatorType,
+  blasts: [
+    [0.18, 1180, 1320],
+    [0.3, 1320, 1180],
+  ] as readonly (readonly [number, number, number])[],
+  gap: 0.07,
+  breath: 0.22,
+}
+
 type Context = AudioContext & { destination: AudioNode }
 
 export class Sounds {
@@ -229,14 +262,15 @@ export class Sounds {
    * breath of noise over the top the way a real whistle has air in it.
    */
   private whistle(at: number, level: number): void {
-    const blast = (start: number, seconds: number, from: number, to: number) => {
-      this.sweepTone(start, seconds, from, to, level, 'square', this.dry)
-      // The pea rattling, near enough.
-      this.swish(start, seconds, 1500, 1900, level * 0.3, 'bandpass', this.dry)
+    let start = at
+    for (const [seconds, from, to] of WHISTLE.blasts) {
+      this.sweepTone(start, seconds, from, to, level, WHISTLE.wave, this.dry)
+      if (WHISTLE.breath > 0) {
+        // The pea rattling, near enough: a band of noise riding the tone.
+        this.swish(start, seconds, from, to, level * WHISTLE.breath, 'bandpass', this.dry)
+      }
+      start += seconds + WHISTLE.gap
     }
-
-    blast(at, 0.2, 1250, 1400)
-    blast(at + 0.26, 0.34, 1400, 1250)
   }
 
   /** White noise, made once per call and short enough not to be worth caching. */
