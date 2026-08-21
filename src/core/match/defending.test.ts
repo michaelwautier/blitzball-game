@@ -170,10 +170,10 @@ describe('the chosen tackle', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    for (let i = 0; i < 300 && state.phase.kind === 'challenge'; i++) stepMatch(state, 1 / 60)
 
-    expect(result.success).toBe(false)
-    expect(result.summary).toContain('Venom Tackle')
+    expect(state.announcement).toContain('Venom Tackle')
     expect(hasStatus(carrier, 'poison')).toBe(true)
   })
 
@@ -229,9 +229,11 @@ describe('when the AI defends', () => {
     encounter.endurance = 1
     state.endurance = 1
 
-    const result = resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    resolveEncounter(state, encounter, { kind: 'breakthrough', breakPast: 2 })
+    for (let i = 0; i < 300 && state.phase.kind === 'challenge'; i++) stepMatch(state, 1 / 60)
+
     // Doram knows Venom Tackle and nobody had to pick it for him.
-    expect(result.summary).toContain('Venom Tackle')
+    expect(state.announcement).toContain('Venom Tackle')
   })
 
   it('picks something it can afford when asked to choose', () => {

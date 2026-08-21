@@ -5,6 +5,7 @@ import { distanceBetween, opponentOf, playerById } from '../match/queries'
 import { giveBallTo } from '../match/possession'
 import { startPass, startShot } from '../match/flight'
 import type {
+  ChallengeRun,
   DefenceChoice,
   Encounter,
   EncounterAction,
@@ -20,6 +21,7 @@ import { findTechnique, techniquesOf, type Technique } from '../../data/techniqu
 import { applyStatus } from '../match/status'
 import { canAfford, effectiveStat, spendHp } from '../match/stats'
 import { awardExp } from '../match/exp'
+import { announce as announceChallenge } from '../match/announce'
 
 /**
  * How close a defender must be to drag the carrier into an encounter.
@@ -431,65 +433,24 @@ export function resolveEncounter(
  * progressively more dangerous — that pressure is what makes passing and
  * shooting real decisions rather than fallbacks.
  */
-interface Challenge {
-  /** Endurance left afterwards. Zero or below means the ball was lost. */
-  endurance: number
-  /** Each tackle as it landed, for the summary. */
-  rolls: number[]
-  /** Whoever took the endurance to zero, if anyone did. */
-  tackler: Player | undefined
-  /** Everyone who put a challenge in, in the order they made it. */
-  beaten: Player[]
-}
-
-/**
- * Take on the first `count` defenders, one challenge at a time.
- *
- * Shared by every action that involves getting past somebody: a full
- * breakthrough is simply this against all of them, and a pass or shot may run it
- * against however many the carrier chose to clear first. Whoever takes the
- * endurance to zero comes away with the ball, and the defenders behind them
- * never needed to commit.
- */
-function challengeDefenders(
-  state: MatchState,
-  encounter: Encounter,
-  carrier: Player,
-  count: number,
-): Challenge {
-  let endurance = encounter.endurance
-  const rolls: number[] = []
-  const beaten: Player[] = []
-  let tackler: Player | undefined
-
-  for (const engaged of encounter.defenders.slice(0, count)) {
-    const defender = playerById(state, engaged.id)
-    if (!defender) continue
-
-    const tackle = rollStat(effectiveStat(defender, 'at'), state.rng)
-    endurance -= tackle
-    rolls.push(tackle)
-    beaten.push(defender)
-
-    if (endurance <= 0) {
-      tackler = defender
-      break
-    }
-  }
-
-  state.endurance = Math.max(0, endurance)
-  // Everyone who put a challenge in is carried past the carrier by the end of
-  // it, whether or not they came away with the ball — but whoever won it is not
-  // out of the play, they are the play.
-  pushPastCarrier(state, beaten, carrier, tackler)
-
-  return { endurance, rolls, tackler, beaten }
-}
-
 /** "EN 14 − 6 − 5 = 3", the arithmetic laid out as it happened. */
 function describeChallenge(from: number, rolls: number[], to: number): string {
   return rolls.length > 0 ? `EN ${from} − ${rolls.join(' − ')} = ${to}` : ''
 }
+
+/**
+ * Seconds the carrier who just lost the ball spends out of the play.
+ *
+ * They were beaten; being beaten should cost the same whichever end of the
+ * challenge you were on. Without it the dispossessed player kept full agency and
+ * could challenge back on the very next frame — which is exactly what happened,
+ * because the space bar that confirmed the breakthrough is also the one that
+ * challenges. The ball changed hands and a "how do you challenge?" menu opened
+ * instantly on top of it, with nothing to say what had gone wrong.
+ *
+ * Shorter than `BREAKTHROUGH_RECOVERY`: losing the ball already costs the ball.
+ */
+export const DISPOSSESSED_RECOVERY = 1.2
 
 /** Hand the ball to whoever won it, with whatever technique they had ready. */
 function concedePossession(
@@ -501,6 +462,10 @@ function concedePossession(
   awardExp(state, tackler, 'tackle')
   const technique = useTackleTechnique(tackler, carrier, defence)
   giveBallTo(state, tackler)
+  // Beaten, and out of the play for it — see the constant. Applied after
+  // `giveBallTo`, which is what would otherwise leave them free to turn straight
+  // round and challenge the player who has just taken it.
+  carrier.recovery = Math.max(carrier.recovery, DISPOSSESSED_RECOVERY)
   return `tackled by ${tackler.def.name}${technique ? ` · ${technique.name}!` : ''}`
 }
 
@@ -522,41 +487,141 @@ function resolveBreakthrough(
   const count = Math.max(1, Math.min(action.breakPast, encounter.defenders.length))
   spendHp(carrier, ACTION_HP_COST.breakthrough)
 
-  const challenge = challengeDefenders(state, encounter, carrier, count)
-  const sums = describeChallenge(encounter.endurance, challenge.rolls, challenge.endurance)
-
-  if (challenge.tackler) {
-    return {
-      action: 'breakthrough',
-      success: false,
-      summary: `${sums} · ${concedePossession(state, challenge.tackler, carrier, encounter.defence)}`,
-    }
+  // Handed to the challenge phase rather than settled here. Each defender is
+  // taken in turn, a beat apart, so the endurance can be watched going.
+  state.phase = {
+    kind: 'challenge',
+    challenge: {
+      carrierId: carrier.id,
+      queue: encounter.defenders.slice(0, count),
+      survivors: encounter.defenders.slice(count),
+      endurance: encounter.endurance,
+      from: encounter.endurance,
+      rolls: [],
+      beaten: [],
+      timer: 0,
+      defence: encounter.defence,
+    },
   }
 
-  awardExp(state, carrier, 'breakthrough')
-  // The encounter always reflects who is still on the carrier, even in the
-  // moment it ends: nothing should ever be contested by a defender who has
-  // just been beaten.
-  const survivors = encounter.defenders.slice(count)
-  encounter.defenders = survivors
-  encounter.endurance = state.endurance
-
-  if (survivors.length === 0) {
-    state.engageCooldown = BREAKTHROUGH_GRACE
-    return {
-      action: 'breakthrough',
-      success: true,
-      summary: `${sums} · ${carrier.def.name} breaks through!`,
-    }
-  }
-
-  // Past one, still held by the next. The encounter carries on against them —
-  // and only their blocking counts against whatever comes next.
   return {
     action: 'breakthrough',
     success: true,
-    continues: true,
-    summary: `${sums} · past ${beatenNames(challenge)}, still held`,
+    summary: `${carrier.def.name} takes on ${namesOf(state, encounter.defenders.slice(0, count))}`,
+  }
+}
+
+/** "Larbeight" or "Larbeight & Kulukan", as FFX names them rather than counting. */
+function namesOf(state: MatchState, defenders: readonly EncounterDefender[]): string {
+  const names = defenders.map((d) => playerById(state, d.id)?.def.name ?? '?')
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
+}
+
+/**
+ * Seconds between one tackle landing and the next going in.
+ *
+ * Long enough to read the endurance change, short enough that barging through
+ * two defenders is still one movement rather than a cutscene.
+ */
+export const TACKLE_BEAT = 0.55
+
+/** Seconds the last tackle is left on screen before play resumes. */
+export const CHALLENGE_SETTLE = 0.75
+
+/**
+ * Advance a breakthrough that is playing out.
+ *
+ * One tackle per beat, in the order the menu named them. The endurance carried
+ * on the run is the live one — `state.endurance` follows it down — so whatever is
+ * drawing the number watches it fall rather than jumping to the final figure.
+ */
+export function stepChallenge(state: MatchState, dt: number, run: ChallengeRun): void {
+  run.timer -= dt
+  if (run.timer > 0) return
+
+  const carrier = playerById(state, run.carrierId)
+  if (!carrier || state.ball.carrier !== carrier.id) {
+    state.phase = { kind: 'play' }
+    return
+  }
+
+  const next = run.queue.shift()
+
+  // Everyone in the way has had their go and the carrier is still holding it.
+  if (!next) return finishChallenge(state, run, carrier)
+
+  const defender = playerById(state, next.id)
+  if (!defender) return stepChallenge(state, 0, run)
+
+  const tackle = rollStat(effectiveStat(defender, 'at'), state.rng)
+  run.rolls.push(tackle)
+  run.beaten.push(next)
+  run.endurance -= tackle
+  state.endurance = Math.max(0, run.endurance)
+
+  const sums = describeChallenge(run.from, run.rolls, run.endurance)
+
+  if (run.endurance <= 0) {
+    // This one took it. Nobody behind them needs to bother.
+    // Everyone who was in this is done challenging, whether they got their
+    // tackle in or the ball was gone before they could — exactly as it was when
+    // the whole thing settled in one tick.
+    chargeCommittedDefenders(state, {
+      ...emptyEncounter(carrier),
+      defenders: [...run.beaten, ...run.queue, ...run.survivors],
+    })
+    run.queue.length = 0
+    pushPastCarrier(state, [defender], carrier, defender)
+    announceChallenge(state, `${sums} · ${concedePossession(state, defender, carrier, run.defence)}`)
+    state.phase = { kind: 'play' }
+    return
+  }
+
+  pushPastCarrier(state, [defender], carrier)
+  announceChallenge(state, `${sums} · past ${defender.def.name}`)
+  run.timer = run.queue.length > 0 ? TACKLE_BEAT : CHALLENGE_SETTLE
+}
+
+/** A bare encounter shell, only ever used to hand `chargeCommittedDefenders` a list. */
+function emptyEncounter(carrier: Player): Encounter {
+  return {
+    kind: 'contested',
+    carrierId: carrier.id,
+    defenders: [],
+    endurance: 0,
+    thinkTimer: 0,
+    awaitingDefence: false,
+    defence: null,
+  }
+}
+
+/** The carrier survived everyone they took on. */
+function finishChallenge(state: MatchState, run: ChallengeRun, carrier: Player): void {
+  awardExp(state, carrier, 'breakthrough')
+  const sums = describeChallenge(run.from, run.rolls, run.endurance)
+
+  if (run.survivors.length === 0) {
+    state.engageCooldown = BREAKTHROUGH_GRACE
+    announceChallenge(state, `${sums} · ${carrier.def.name} breaks through!`)
+    state.phase = { kind: 'play' }
+    return
+  }
+
+  // Past the ones they took on, still held by the rest. Back to the decision,
+  // against whoever is left and with the endurance this run cost them.
+  announceChallenge(state, `${sums} · past ${namesOf(state, run.beaten)}, still held`)
+  state.phase = {
+    kind: 'encounter',
+    encounter: {
+      kind: 'contested',
+      carrierId: carrier.id,
+      defenders: run.survivors,
+      endurance: state.endurance,
+      thinkTimer: carrier.team === USER_TEAM ? 0 : AI_THINK_SECONDS,
+      awaitingDefence: false,
+      defence: run.defence,
+    },
   }
 }
 
@@ -576,10 +641,6 @@ export function chargeCommittedDefenders(state: MatchState, encounter: Encounter
   }
 }
 
-/** The defenders a challenge went through, for the summary line. */
-function beatenNames(challenge: Challenge): string {
-  return challenge.beaten.map((defender) => defender.def.name).join(' & ')
-}
 
 /**
  * Seconds a beaten defender takes to be carried past the carrier.

@@ -39,6 +39,16 @@ function runAutoplay(state: MatchState, ticks: number): void {
   }
 }
 
+/**
+ * Run a committed breakthrough out to its end.
+ *
+ * Taken as a parameter rather than closed over, so the phase is not narrowed by
+ * whatever the caller last assigned to it.
+ */
+function settleChallenge(match: MatchState): void {
+  for (let i = 0; i < 300 && match.phase.kind === 'challenge'; i++) stepMatch(match, 1 / 60)
+}
+
 describe('the clock', () => {
   it('counts down through the half', () => {
     const state = newMatch()
@@ -300,6 +310,11 @@ describe('encounter input', () => {
       },
     }
     expect(submitEncounterAction(state, { kind: 'breakthrough', breakPast: 2 })).toBe(true)
+
+    // Accepted, and handed to the challenge that plays it out one tackle at a
+    // time; open play resumes once that has finished.
+    expect(state.phase.kind).toBe('challenge')
+    settleChallenge(state)
     expect(state.phase.kind).toBe('play')
   })
 })

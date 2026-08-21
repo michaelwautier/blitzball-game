@@ -126,6 +126,39 @@ export interface EncounterDefender {
   block: number
 }
 
+/**
+ * A breakthrough playing out, one defender at a time.
+ *
+ * The rolls used to happen together, in a single tick, and be reported as one
+ * line of arithmetic: `EN 14 − 6 − 5 = 3`. Correct, and unreadable — two tackles
+ * landed simultaneously and the endurance that decided everything went from full
+ * to spent between one frame and the next. Barging through two defenders is the
+ * most consequential thing a carrier does, and it deserves to be watched.
+ *
+ * So the challenge queues them and takes them in turn, nearest first, with the
+ * endurance falling visibly after each. The order is the same one the menu named
+ * and the same one the rolls always used; only the pacing is new.
+ */
+export interface ChallengeRun {
+  carrierId: string
+  /** Yet to put their tackle in, nearest first. */
+  queue: EncounterDefender[]
+  /** Left on the carrier, to resume the encounter against if they get through. */
+  survivors: EncounterDefender[]
+  /** Endurance as it stands, dropping with each tackle that lands. */
+  endurance: number
+  /** Endurance before any of them, so the running sum can be shown. */
+  from: number
+  /** Each tackle as it landed. */
+  rolls: number[]
+  /** Whoever has been gone past so far, in the order it happened. */
+  beaten: EncounterDefender[]
+  /** Seconds until the next tackle lands. */
+  timer: number
+  /** How the defence chose to come in, carried through to whoever wins the ball. */
+  defence: DefenceChoice | null
+}
+
 export interface EncounterResult {
   action: EncounterAction['kind']
   success: boolean
@@ -222,6 +255,7 @@ export interface BallFlight {
 export type MatchPhase =
   | { kind: 'play' }
   | { kind: 'encounter'; encounter: Encounter }
+  | { kind: 'challenge'; challenge: ChallengeRun }
   | { kind: 'flight'; flight: BallFlight }
   | { kind: 'celebration'; scorer: TeamId; timer: number }
   | { kind: 'halfTime'; timer: number }

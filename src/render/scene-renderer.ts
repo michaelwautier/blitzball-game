@@ -209,8 +209,12 @@ export class SceneRenderer {
     const towards = Math.sign(threatenedGoalX(state) - focus.x) || 1
 
     // Closer while a decision is open, so the defenders the menu names are
-    // legible. Eased into like every other camera move, by the lerp below.
-    const close = state.phase.kind === 'encounter' ? ENCOUNTER_CLOSE_IN : 1
+    // legible — and held there through the challenge it commits to, which is
+    // the part actually worth watching. Pulling out the moment the menu closes
+    // would swing the camera away exactly as the tackles start landing.
+    // Eased into like every other camera move, by the lerp below.
+    const decided = state.phase.kind === 'encounter' || state.phase.kind === 'challenge'
+    const close = decided ? ENCOUNTER_CLOSE_IN : 1
     cameraGoalFor(this.cameraGoal, focus, towards, close)
 
     // Aim a little beyond play, so the pitch sits in the middle of the frame

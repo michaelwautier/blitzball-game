@@ -173,8 +173,12 @@ describe('a defender who committed', () => {
     const state = glued('committed')
     requestChallenge(state)
     submitDefence(state, null)
-    for (let i = 0; i < 600 && state.phase.kind === 'encounter'; i++) stepMatch(state, TICK)
-    expect(state.phase.kind, 'the encounter never resolved').not.toBe('encounter')
+    // A breakthrough hands off to a challenge that plays out one tackle at a
+    // time, so the decision is not over until that has finished too.
+    const settling = (match: MatchState) =>
+      match.phase.kind === 'encounter' || match.phase.kind === 'challenge'
+    for (let i = 0; i < 600 && settling(state); i++) stepMatch(state, TICK)
+    expect(settling(state), 'the encounter never resolved').toBe(false)
 
     // However it went — beaten, or simply thrown past — they are not free to
     // haul the next carrier into another decision on the same breath.
