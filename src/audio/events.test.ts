@@ -110,6 +110,20 @@ describe('hearing what happened', () => {
     expect(soundsBetween(half, half)).toEqual([])
     expect(soundsBetween(quiet(), quiet({ phase: 'fullTime' }))).toEqual(['whistle'])
   })
+
+  it('blows it again to restart the second half', () => {
+    // A half is five minutes. Without this the first whistle of a match arrives
+    // five minutes in, which is indistinguishable from it not working.
+    const half = quiet({ phase: 'halfTime' })
+    expect(soundsBetween(half, quiet({ phase: 'play', half: 2 }))).toEqual(['whistle'])
+  })
+
+  it('does not whistle every restart', () => {
+    // Kicking off after a goal is not a stoppage being lifted, and the goal has
+    // already had its say.
+    const after = quiet({ phase: 'celebration' })
+    expect(soundsBetween(after, quiet())).not.toContain('whistle')
+  })
 })
 
 describe('reading a real match', () => {

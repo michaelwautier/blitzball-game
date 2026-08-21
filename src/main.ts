@@ -112,9 +112,15 @@ function startNextMatch(): void {
   sides = { home: mine, away: theirs }
   state = createMatch(mine, theirs, fixtureSeed(season, fixture), squad.lookupFor(sides))
   progress = null
+  // A new match, so nothing carries over from the last one: the first frame has
+  // no previous frame to be compared against.
+  heard = null
 
   league.hide()
   showMatch(true)
+  // Kick-off. There is no phase change to read this from — a match simply
+  // begins in play — so it is the one sound the presentation asks for directly.
+  sounds.play('whistle')
 }
 
 /**

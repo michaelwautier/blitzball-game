@@ -420,6 +420,13 @@ against the ladder alone.
     the renderer reads positions. `CLAUDE.md` now says so as a rule, since an event fired *for*
     the presentation is the tempting thing to add and the thing to avoid.
     `m` mutes. Nothing plays before the first keypress, which browsers require anyway.
+    The whistle is the one exception to the water, and had to be: sitting at 1900–2100Hz against
+    a 2200Hz cutoff it was inaudible, because right on the knee a square wave loses every
+    harmonic that makes it shrill and what survives is a quiet sine. It now takes a dry bus, at
+    a lower pitch with a breath of noise over it — which is also the truer story, since a
+    whistle is blown *above* the water by someone who means to be heard through it. It blows at
+    kick-off and at the restart too, not only at the two ends: a half is five minutes, and a
+    sound nobody hears for five minutes is indistinguishable from one that does not work.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

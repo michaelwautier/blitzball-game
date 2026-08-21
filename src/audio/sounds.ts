@@ -32,7 +32,7 @@ const LEVELS: Record<MatchSound, number> = {
   tackle: 0.8,
   breakthrough: 0.55,
   encounter: 0.4,
-  whistle: 0.65,
+  whistle: 0.9,
 }
 
 type Context = AudioContext & { destination: AudioNode }
@@ -131,11 +131,14 @@ export class Sounds {
 
     this.context = context
     this.master = master
-    // Everything is played into the filter, so nothing can bypass the water.
+    // Two ways in. Almost everything goes through the water; the whistle does
+    // not, because it is the one sound made above it.
     this.into = water
+    this.dry = master
   }
 
   private into: AudioNode | null = null
+  private dry: AudioNode | null = null
 
   /** Filtered noise sweeping between two frequencies: every throw and impact. */
   private swish(
@@ -145,9 +148,10 @@ export class Sounds {
     to: number,
     level: number,
     type: BiquadFilterType = 'bandpass',
+    bus: AudioNode | null = this.into,
   ): void {
     const context = this.context
-    if (!context || !this.into) return
+    if (!context || !bus) return
 
     const source = context.createBufferSource()
     source.buffer = this.noise(seconds)
@@ -161,7 +165,7 @@ export class Sounds {
     const gain = context.createGain()
     envelope(gain, at, seconds, level)
 
-    source.connect(filter).connect(gain).connect(this.into)
+    source.connect(filter).connect(gain).connect(bus)
     source.start(at)
     source.stop(at + seconds)
   }
@@ -178,9 +182,10 @@ export class Sounds {
     to: number,
     level: number,
     type: OscillatorType = 'triangle',
+    bus: AudioNode | null = this.into,
   ): void {
     const context = this.context
-    if (!context || !this.into) return
+    if (!context || !bus) return
 
     const osc = context.createOscillator()
     osc.type = type
@@ -190,7 +195,7 @@ export class Sounds {
     const gain = context.createGain()
     envelope(gain, at, seconds, level)
 
-    osc.connect(gain).connect(this.into)
+    osc.connect(gain).connect(bus)
     osc.start(at)
     osc.stop(at + seconds)
   }
@@ -210,10 +215,28 @@ export class Sounds {
     this.swish(at, 1.1, 300, 900, level * 0.45, 'lowpass')
   }
 
-  /** Two-tone, and the one thing meant to cut through the water. */
+  /**
+   * The referee, and the only thing here that does not go through the water.
+   *
+   * It was inaudible, for two reasons that compounded. It sat at 1900–2100Hz
+   * against a low-pass cutting at 2200 — right on the knee, where a square wave
+   * loses every harmonic that makes it shrill and what survives is a quiet sine
+   * at the corner frequency. And a whistle *should* be the exception: it is blown
+   * above the surface by someone who wants to be heard through it, which is the
+   * whole reason a real one works at a pool.
+   *
+   * So it takes the dry bus, sits lower where it has room to be loud, and gets a
+   * breath of noise over the top the way a real whistle has air in it.
+   */
   private whistle(at: number, level: number): void {
-    this.sweepTone(at, 0.22, 1900, 2100, level, 'square')
-    this.sweepTone(at + 0.26, 0.3, 2100, 1900, level, 'square')
+    const blast = (start: number, seconds: number, from: number, to: number) => {
+      this.sweepTone(start, seconds, from, to, level, 'square', this.dry)
+      // The pea rattling, near enough.
+      this.swish(start, seconds, 1500, 1900, level * 0.3, 'bandpass', this.dry)
+    }
+
+    blast(at, 0.2, 1250, 1400)
+    blast(at + 0.26, 0.34, 1400, 1250)
   }
 
   /** White noise, made once per call and short enough not to be worth caching. */

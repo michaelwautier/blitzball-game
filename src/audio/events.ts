@@ -88,8 +88,12 @@ export function soundsBetween(before: AudioSnapshot, now: AudioSnapshot): MatchS
 
   if (now.phase === 'encounter' && before.phase !== 'encounter') heard.push('encounter')
 
-  // The whistle: both ends of the match, and the break in the middle.
+  // The whistle: both ends of the match, the break in the middle, and the
+  // restart out of it. The restart matters more than it sounds — a half is five
+  // minutes, so without it the first whistle of a match comes five minutes in,
+  // and a feature nobody hears for five minutes is one nobody believes works.
   if (now.phase === 'halfTime' && before.phase !== 'halfTime') heard.push('whistle')
+  if (before.phase === 'halfTime' && now.phase === 'play') heard.push('whistle')
   if (now.phase === 'fullTime' && before.phase !== 'fullTime') heard.push('whistle')
 
   return heard
