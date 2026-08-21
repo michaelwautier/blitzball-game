@@ -284,15 +284,27 @@
         border-left: 15px solid currentColor;
         filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.7));
       }
-      .marker-distance {
+      .marker-label {
+        padding: 1px 6px;
+        border-radius: 3px;
+        background: rgb(6 16 28 / 0.72);
         font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
         letter-spacing: 0.04em;
+        white-space: nowrap;
       }
       #ball-marker.marker-theirs {
         color: #ff8b7a;
       }
+      #ball-marker.marker-ours,
       #ball-marker.marker-loose {
         color: #9fe8ff;
+      }
+      /* A throw that will arrive with something, and one that will not. */
+      #ball-marker.marker-holding {
+        color: #8fe388;
+      }
+      #ball-marker.marker-failing {
+        color: #ff8b7a;
       }
       #stats {
         position: fixed;

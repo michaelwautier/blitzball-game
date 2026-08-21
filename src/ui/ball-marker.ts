@@ -1,67 +1,114 @@
 import { USER_TEAM, type MatchState } from '../core/match/types'
-import { distanceBetween, playerById } from '../core/match/queries'
-import type { EdgeMarker } from '../render/off-screen'
+import { distanceBetween, keeperFor, opponentOf, playerById } from '../core/match/queries'
+import { powerLeft } from '../core/match/flight'
+import { expectedCatch } from '../core/encounter/formulas'
+import { effectiveStat } from '../core/match/stats'
+import type { BallView } from '../render/scene-renderer'
 
 /**
- * An arrow at the edge of the frame, pointing at play you cannot see.
+ * What the ball is doing, drawn on top of the scene.
  *
- * The camera holds a fixed stand-off behind whoever you are steering, which is
- * what stops the controls meaning different things in different parts of the
- * pool. The cost is that play at the far end is off screen — and the pool is now
- * 276 units goal to goal against a 51-unit stand-off, so that is a long way off
- * screen.
+ * Two jobs, because they are the same job: saying where the ball is and what it
+ * is carrying. Off screen it is an arrow at the edge of the frame with the
+ * distance you would have to swim. In flight it is the power the throw still
+ * has, falling as it travels.
  *
- * Shown only when the ball is genuinely out of view, and never while you are the
- * one carrying it, since then it is a yard in front of your own nose. The
- * distance is the one from *your* player rather than from the camera: what
- * matters is how far you have to swim, not how far the lens is.
+ * That second one is the whole decision made visible. A throw bleeds power over
+ * the distance it covers and is settled on what is left when it lands — so
+ * whether a pass will be held, or a shot will beat the keeper, is decided by a
+ * number that until now existed only inside the engine. Watching it come down
+ * is watching the outcome being decided.
  */
 export class BallMarker {
-  private lastLabel = ''
+  private lastText = ''
+  private lastTone = ''
 
   constructor(private readonly element: HTMLElement) {
     this.element.append(this.arrow, this.label)
   }
 
-  private readonly arrow = arrowElement()
-  private readonly label = labelElement()
+  private readonly arrow = span('marker-arrow')
+  private readonly label = span('marker-label')
 
-  update(state: MatchState, marker: EdgeMarker | null): void {
+  update(state: MatchState, view: BallView | null): void {
     const you = playerById(state, state.controlled)
     const carrying = state.ball.carrier === state.controlled
+    const flight = state.phase.kind === 'flight' ? state.phase.flight : null
 
-    if (!marker || !you || carrying) {
+    // Nothing to say: the ball is in view, nobody has thrown it, and it is
+    // either yours or plainly where you can see it.
+    if (!view || !you || (!flight && (carrying || !view.offScreen))) {
       if (!this.element.hidden) this.element.hidden = true
       return
     }
 
     this.element.hidden = false
-    this.element.style.left = `${marker.x * 100}%`
-    this.element.style.top = `${marker.y * 100}%`
-    this.arrow.style.transform = `rotate(${marker.angle}rad)`
+    this.element.style.left = `${view.x * 100}%`
+    this.element.style.top = `${view.y * 100}%`
+    this.arrow.hidden = !view.offScreen
+    this.arrow.style.transform = `rotate(${view.angle}rad)`
 
-    // Their colour, so an arrow is instantly "they have it" or "we have it"
-    // rather than something to decode.
+    const reading = flight ? this.throwReading(state, flight) : this.distanceReading(state, you)
+    this.paint(reading)
+  }
+
+  /**
+   * What the throw has left, and whether that is going to be enough.
+   *
+   * A shot is measured against the middle of the keeper's catching, which is the
+   * same figure the AI shoots against — not the bare stat, because the band is
+   * not centred on it. A pass only has to arrive with something.
+   */
+  private throwReading(state: MatchState, flight: NonNullable<Flight>): Reading {
+    const left = Math.max(0, Math.round(powerLeft(flight)));
+
+    if (flight.kind === 'spilled') return { text: 'spilled', tone: 'marker-failing' }
+
+    if (flight.kind === 'pass') {
+      return {
+        text: `PA ${left}`,
+        tone: left > 0 ? 'marker-holding' : 'marker-failing',
+      }
+    }
+
+    const keeper = keeperFor(state, opponentOf(flight.fromTeam))
+    const facing = keeper ? Math.round(expectedCatch(effectiveStat(keeper, 'ca'))) : 0
+    return {
+      text: `SH ${left} vs CA ${facing}`,
+      tone: left > facing ? 'marker-holding' : 'marker-failing',
+    }
+  }
+
+  private distanceReading(state: MatchState, you: { x: number; y: number }): Reading {
     const carrier = state.ball.carrier ? playerById(state, state.ball.carrier) : undefined
-    this.element.classList.toggle('marker-theirs', !!carrier && carrier.team !== USER_TEAM)
-    this.element.classList.toggle('marker-loose', !carrier)
+    return {
+      text: `${Math.round(distanceBetween(you, state.ball))}m`,
+      tone: !carrier ? 'marker-loose' : carrier.team === USER_TEAM ? 'marker-ours' : 'marker-theirs',
+    }
+  }
 
-    const label = `${Math.round(distanceBetween(you, state.ball))}m`
-    if (label !== this.lastLabel) {
-      this.lastLabel = label
-      this.label.textContent = label
+  private paint(reading: Reading): void {
+    if (reading.text !== this.lastText) {
+      this.lastText = reading.text
+      this.label.textContent = reading.text
+    }
+    if (reading.tone !== this.lastTone) {
+      this.element.classList.remove(this.lastTone)
+      this.lastTone = reading.tone
+      this.element.classList.add(reading.tone)
     }
   }
 }
 
-function arrowElement(): HTMLElement {
-  const arrow = document.createElement('div')
-  arrow.className = 'marker-arrow'
-  return arrow
+type Flight = Extract<MatchState['phase'], { kind: 'flight' }>['flight']
+
+interface Reading {
+  text: string
+  tone: string
 }
 
-function labelElement(): HTMLElement {
-  const label = document.createElement('span')
-  label.className = 'marker-distance'
-  return label
+function span(className: string): HTMLElement {
+  const element = document.createElement('span')
+  element.className = className
+  return element
 }

@@ -72,3 +72,8 @@ export function edgeMarker(
     angle: Math.atan2(-edgeY, edgeX),
   }
 }
+
+/** Where a point that *is* in view sits, in the same viewport fractions. */
+export function viewportPoint(ndcX: number, ndcY: number): { x: number; y: number } {
+  return { x: (ndcX + 1) / 2, y: (1 - ndcY) / 2 }
+}

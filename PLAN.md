@@ -427,6 +427,26 @@ against the ladder alone.
     whistle is blown *above* the water by someone who means to be heard through it. It blows at
     kick-off and at the restart too, not only at the two ends: a half is five minutes, and a
     sound nobody hears for five minutes is indistinguishable from one that does not work.
+21. **Watching a throw arrive** ✅ (#57). A throw bleeds power over the distance it covers and
+    is settled on whatever is left when it lands — so whether a pass is held, or a shot beats
+    the keeper, was decided by a number that existed only inside the engine.
+    It now rides the ball: `PA 7` falling as a pass travels, and `SH 12 vs CA 10` on a shot,
+    green while it is winning and red once it is not. A shot is measured against the middle of
+    the keeper's catching, the same figure the AI shoots against — not the bare stat, since the
+    band is not centred on it.
+    One correction to how this was assumed to work: power is *not* drained continuously in
+    flight. #39 made decay a charge on arrival precisely so nothing could die halfway and be
+    picked up by whoever happened to be standing there. `powerLeft` is the same arithmetic read
+    early, so the live figure and the one that settles the throw cannot drift — a readout that
+    disagreed with the outcome would be worse than none, because it would be believed. Six tests
+    hold the two together, including that the last frame of a fumbled throw already reads zero.
+    The off-screen arrow and this are one component, because they are one question: where the
+    ball is and what it is carrying.
+    Noticed while writing the tests, and worth knowing before the next tuning pass: at this pool
+    size `PASS_DECAY_PER_UNIT` is 0.02 a unit, so a level-one PA of 10 carries **500 units
+    against a pool 300 across**. An unmarked passer can reach anyone, always. Passing range only
+    binds when someone is blocking — which is most of the time the menu is open, so the range
+    labels from 13 still earn their place, but a keeper's distribution is now never in doubt.
 
 ### Phase 6 — Squads & recruiting (after Phase 5, unordered)
 No order chosen yet. The candidates, roughly by size:

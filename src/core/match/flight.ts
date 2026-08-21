@@ -128,8 +128,20 @@ export function stepFlight(state: MatchState, flight: BallFlight, dt: number): v
   }
 }
 
-/** What a throw has left by the time it arrives. */
-function powerOnArrival(flight: BallFlight): number {
+/**
+ * What a throw has left, right now.
+ *
+ * Read at the moment of arrival this is what the receiver or the keeper is
+ * dealing with, which is the only place the engine uses it. Read mid-flight it
+ * is what the throw is carrying at that instant, because `travelled` grows as it
+ * goes — so the same arithmetic serves as a live readout, and cannot drift from
+ * the figure that actually settles the throw.
+ *
+ * Exported for that second use. Power is charged on arrival rather than bled
+ * continuously (see the note on `stepFlight`), so nothing is really counting
+ * down inside the engine; this is the number that would be, made visible.
+ */
+export function powerLeft(flight: BallFlight): number {
   const rate = flight.kind === 'pass' ? PASS_DECAY_PER_UNIT : SHOT_DECAY_PER_UNIT
   return flight.power - flight.travelled * rate
 }
@@ -205,7 +217,7 @@ function resolvePassArrival(state: MatchState, flight: BallFlight): void {
 
   // Distance settled here, having flown the whole way. Beyond the passer's
   // range means the ball gets there with nothing on it and is fumbled.
-  if (powerOnArrival(flight) <= 0) {
+  if (powerLeft(flight) <= 0) {
     spill(state, flight, `Out of range — ${receiver.def.name} cannot hold it`)
     return
   }
@@ -238,7 +250,7 @@ function resolveShotArrival(state: MatchState, flight: BallFlight): void {
 
   // What survived the distance. A shot that arrives spent is gathered rather
   // than saved: the keeper never had to do anything.
-  let power = powerOnArrival(flight)
+  let power = powerLeft(flight)
   if (power <= 0) {
     spill(state, flight, 'The shot drops short')
     return
