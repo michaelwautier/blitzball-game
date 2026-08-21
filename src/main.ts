@@ -143,8 +143,9 @@ function finishMatch(): void {
       playedAtHome ? mine : theirs,
       playedAtHome ? theirs : mine,
     )
-    // The rest of the round catches up with the user.
-    simulateRound(season, fixture.round)
+    // The rest of the round is played by the same engine, at the same levels,
+    // and everyone in it keeps what they earn.
+    simulateRound(season, fixture.round, squad)
   }
 
   save()

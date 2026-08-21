@@ -3,6 +3,8 @@ import { fixtureKey, involves, roundRobin, roundsIn, sameFixture, type Fixture }
 import { simulateMatch } from './simulate'
 import { standings, type MatchResult, type TableRow } from './standings'
 import type { CareerLookup } from '../match/state'
+import type { TeamId } from '../match/types'
+import type { TeamDef } from '../../data/types'
 
 /**
  * A season in progress.
@@ -118,7 +120,7 @@ export function recordResult(
  * resolved in — which is what lets a season be saved, reloaded and continued
  * without the league quietly rewriting its own history.
  */
-export function simulateRound(season: Season, round: number, careers?: CareerLookup): number {
+export function simulateRound(season: Season, round: number, careers?: SeasonCareers): number {
   let played = 0
 
   for (const fixture of season.fixtures) {
@@ -126,21 +128,43 @@ export function simulateRound(season: Season, round: number, careers?: CareerLoo
     if (involves(fixture, season.userTeamId)) continue
     if (isPlayed(season, fixture)) continue
 
+    const home = findTeam(fixture.home)
+    const away = findTeam(fixture.away)
     const result = simulateMatch(
-      findTeam(fixture.home),
-      findTeam(fixture.away),
+      home,
+      away,
       fixtureSeed(season, fixture),
-      careers,
+      careers?.lookupFor({ home, away }),
     )
     recordResult(season, fixture, result.home, result.away)
+    // Handed out rather than discarded: the sides the user is chasing improve
+    // by playing, exactly as the user's own does.
+    careers?.bank(result.exp)
     played += 1
   }
 
   return played
 }
 
+/**
+ * The careers a season needs, described rather than imported.
+ *
+ * `Squad` satisfies this without the league knowing that it exists — the same
+ * separation that keeps `core/` from reaching outwards, applied one level down.
+ *
+ * It has to be a lookup *factory* rather than a lookup: a `CareerLookup` answers
+ * questions about `home:` and `away:`, which mean different players in every
+ * fixture. The old signature took a single lookup and passed it to every match
+ * in the round, which no caller ever used and which could not have been right
+ * for more than one of them.
+ */
+export interface SeasonCareers {
+  lookupFor(teams: Record<TeamId, TeamDef>): CareerLookup
+  bank(exp: Readonly<Record<string, number>>): void
+}
+
 /** Every fixture the user is not in, across the whole season. */
-export function simulateRestOfSeason(season: Season, careers?: CareerLookup): number {
+export function simulateRestOfSeason(season: Season, careers?: SeasonCareers): number {
   let played = 0
   for (let round = 1; round <= totalRounds(season); round++) {
     played += simulateRound(season, round, careers)
